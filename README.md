@@ -8,7 +8,7 @@
   <a href="https://yuribedran.github.io/rubi/"><b>Live demo</b></a> ·
   <a href="#5-walkthrough-a-week-with-rubi">Walkthrough</a> ·
   <a href="#4-results">Results</a> ·
-  <a href="#7-install">Install</a> ·
+  <a href="#7-install"><b>Install &amp; test</b></a> ·
   <a href="#2-background-the-ideas-in-plain-words">The theory</a>
 </p>
 
@@ -411,29 +411,64 @@ rubi_registrar → criado: conhecimento/bug-cupom-aplicado-duas-vezes.md
 
 ## 7. Install
 
-You need **Node 18+**.
+You need **Node 18+** (`node --version` to check; get it at [nodejs.org](https://nodejs.org)).
 
-### Claude Code (terminal, VS Code, JetBrains)
+### Claude Code, step by step
+
+**1. Install the plugin.** Open Claude Code in any project and type:
 
 ```text
 /plugin marketplace add YURIBEDRAN/rubi
 /plugin install rubi@rubi
 ```
 
-Turn on early compaction and choose your personal vault:
+Restart Claude Code (exit and run `claude` again) so the hooks load.
+
+**2. Turn on early compaction** (recommended). In a terminal:
 
 ```bash
-git clone https://github.com/YURIBEDRAN/rubi && cd rubi
+git clone https://github.com/YURIBEDRAN/rubi
+cd rubi
 node scripts/instalar.mjs
 ```
 
-The installer writes `CLAUDE_CODE_AUTO_COMPACT_WINDOW` (default `150000`) into `~/.claude/settings.json`, with a backup in `settings.json.bak-rubi`. Undo with `node scripts/instalar.mjs --desfazer`. To try Rubi without installing: `claude --plugin-dir path/to/rubi`.
+It asks two things: where to keep your **personal** notes (default `~/rubi-vault`) and when to compact (default `150000` tokens). It writes `CLAUDE_CODE_AUTO_COMPACT_WINDOW` into `~/.claude/settings.json`, keeping a backup in `settings.json.bak-rubi`. Undo any time with `node scripts/instalar.mjs --desfazer`.
 
-### Claude Desktop
+**3. Check that it works.** Open Claude Code inside a project that uses git.
 
-Download **`rubi.mcpb`** from [Releases](https://github.com/YURIBEDRAN/rubi/releases/latest), open it with Claude Desktop and pick a vault folder. An existing Obsidian vault works.
+| Try this | You should see |
+|---|---|
+| Start a session | A `.rubi/` folder appears in the project, with `mapa.md` listing your modules and central files |
+| Ask: *"what do you know about this project's structure?"* | Claude answers using the map (modules, central files) without exploring first |
+| Ask: *"use Rubi to register a decision: we use Postgres because the client already runs it"* | `criado: conhecimento/decisao-...md`, and the file appears in `.rubi/conhecimento/` |
+| Exit, start a **new** session and ask *"why did we choose Postgres?"* | Claude answers from memory: the recall hook injected the decision |
+| Type `/rubi:raio-x` | A breakdown of where your tokens went in the last 30 days |
 
-In the Desktop app Rubi provides the **memory**: the knowledge graph, hybrid search and handoffs. The code map and the automatic hooks (recall, meter, harvest, early compaction) need Claude Code.
+> [!NOTE]
+> `.rubi/` is meant to be committed so your team shares the memory. Its own `.gitignore` already leaves out the derived index and the automatic session records. If you'd rather keep it private, add `.rubi/` to your project's `.gitignore`.
+
+To try Rubi without installing it: `claude --plugin-dir path/to/rubi`.
+
+### Claude Desktop, step by step
+
+**1.** Download **`rubi.mcpb`** from [Releases](https://github.com/YURIBEDRAN/rubi/releases/latest).
+
+**2.** Double-click the file, or drag it into Claude Desktop under **Settings → Extensions**, and click **Install**.
+
+**3.** Optionally choose a vault folder. Pick an **empty folder used only by Rubi** (for example `Documents/Rubi`) or an Obsidian vault. Leave it blank to use `~/rubi-vault`. Don't point it at a busy folder like Downloads.
+
+**4.** Make sure the extension is **turned on** in Settings → Extensions.
+
+**5. Check that it works.**
+
+| Try this | You should see |
+|---|---|
+| *"Use Rubi to register a preference: I like practical examples"* | Claude confirms it was registered, and a file appears in `<vault>/_pessoal/conhecimento/` |
+| In a **new** conversation: *"look up my preferences in Rubi"* | Claude finds "I like practical examples" |
+
+If Claude says it can't find a tool called Rubi, the extension is turned off: switch it on in Settings → Extensions and start a new conversation.
+
+In the Desktop app, Rubi provides the **memory**: the knowledge graph, hybrid search and handoffs. The code map and the automatic hooks (recall, meter, harvest, early compaction) need Claude Code. Claude Desktop also has its own built-in memory, so mention Rubi when you want something stored there.
 
 ### claude.ai and mobile: coming soon
 
