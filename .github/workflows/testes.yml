@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
-            | RUBI_MODO=app RUBI_VAULT="$RUNNER_TEMP/vault" timeout 10 node scripts/mcp-server.mjs > saida.txt || true
+            | RUBI_MODO=app RUBI_VAULT="$RUNNER_TEMP/vault" node scripts/mcp-server.mjs > saida.txt
           grep -q '"rubi_contexto"' saida.txt
 
   pacotes:
