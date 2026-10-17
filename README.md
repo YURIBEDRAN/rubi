@@ -17,7 +17,7 @@
   <img alt="Claude Desktop" src="https://img.shields.io/badge/Claude%20Desktop-extension-e0245e?style=flat-square">
   <img alt="claude.ai" src="https://img.shields.io/badge/claude.ai-coming%20soon-8b93a7?style=flat-square">
   <img alt="Zero dependencies" src="https://img.shields.io/badge/dependencies-0-3ccf91?style=flat-square">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-12%20passing-3ccf91?style=flat-square">
+  <a href="https://github.com/YURIBEDRAN/rubi/actions/workflows/testes.yml"><img alt="Tests: Windows, macOS, Linux" src="https://github.com/YURIBEDRAN/rubi/actions/workflows/testes.yml/badge.svg"></a>
   <img alt="MIT" src="https://img.shields.io/badge/license-MIT-8b93a7?style=flat-square">
 </p>
 
