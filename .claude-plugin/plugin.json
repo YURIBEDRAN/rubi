@@ -1,10 +1,20 @@
 {
   "name": "rubi",
   "version": "0.2.0",
-  "description": "Gaste menos token sem perder o fio: compactação cedo com handoff automático, memória em markdown (Obsidian), guarda de leitura e raio-X de gasto.",
-  "author": { "name": "Yuri Bedran", "url": "https://github.com/YURIBEDRAN" },
+  "description": "Keeps Claude sessions short without losing the thread: early compaction with automatic handoffs, a markdown memory vault (Obsidian), a read guard and a token X-ray.",
+  "author": {
+    "name": "Yuri Bedran",
+    "url": "https://github.com/YURIBEDRAN"
+  },
   "homepage": "https://github.com/YURIBEDRAN/rubi",
   "repository": "https://github.com/YURIBEDRAN/rubi",
   "license": "MIT",
-  "keywords": ["memory", "context", "tokens", "obsidian", "handoff", "compaction"]
+  "keywords": [
+    "memory",
+    "context",
+    "tokens",
+    "obsidian",
+    "handoff",
+    "compaction"
+  ]
 }

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 420" width="1000" height="420" role="img" aria-label="Terminal demo of Rubi inside Claude Code">
+<defs><clipPath id="r"><rect width="1000" height="420" rx="16"/></clipPath></defs>
+<style>.cur{animation:b 1s steps(1) infinite}@keyframes b{50%{opacity:0}}</style>
+<g clip-path="url(#r)">
+<rect width="1000" height="420" fill="#07080c"/>
+<rect width="1000" height="40" fill="#12151c"/>
+<circle cx="24" cy="20" r="6" fill="#ff5f57"/><circle cx="44" cy="20" r="6" fill="#febc2e"/><circle cx="64" cy="20" r="6" fill="#28c840"/>
+<text x="500.0" y="25" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif" font-size="13" fill="#8b93a7">claude · ~/shop</text>
+<g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="14.5"><style>@keyframes t0{0%,3.74%{opacity:0}3.75%,94%{opacity:1}94.01%,100%{opacity:0}}</style>
+<g style="animation:t0 16s steps(1) infinite" opacity="0"><text x="30" y="82" fill="#ff5c8a">$</text><text x="50" y="82" fill="#e8eaf0" xml:space="preserve">claude</text></g><style>@keyframes t1{0%,9.68%{opacity:0}9.69%,94%{opacity:1}94.01%,100%{opacity:0}}</style>
+<g style="animation:t1 16s steps(1) infinite" opacity="0"><text x="30" y="109" fill="#ff5c8a">></text><text x="50" y="109" fill="#e8eaf0" xml:space="preserve">/plugin install rubi@rubi</text></g><style>@keyframes t2{0%,15.62%{opacity:0}15.62%,94%{opacity:1}94.01%,100%{opacity:0}}</style>
+<g style="animation:t2 16s steps(1) infinite" opacity="0"><text x="30" y="136" fill="#3ccf91" xml:space="preserve">✓ Installed rubi. Hooks: meter · record · restore · guard</text></g><style>@keyframes t3{0%,21.55%{opacity:0}21.56%,94%{opacity:1}94.01%,100%{opacity:0}}</style>
+<g style="animation:t3 16s steps(1) infinite" opacity="0"><text x="30" y="163" fill="#ff5c8a">></text><text x="50" y="163" fill="#e8eaf0" xml:space="preserve">refactor the checkout flow and add tests</text></g><style>@keyframes t4{0%,27.49%{opacity:0}27.50%,94%{opacity:1}94.01%,100%{opacity:0}}</style>
+<g style="animation:t4 16s steps(1) infinite" opacity="0"><text x="30" y="190" fill="#8b93a7" xml:space="preserve">● Reading web/Checkout.tsx, api/routes.ts …</text></g><style>@keyframes t5{0%,33.43%{opacity:0}33.44%,94%{opacity:1}94.01%,100%{opacity:0}}</style>
+<g style="animation:t5 16s steps(1) infinite" opacity="0"><text x="30" y="217" fill="#f5b84a" xml:space="preserve">[rubi] api/orders.log has 48,210 lines (~410k tokens). Use Grep or offset/limit.</text></g><style>@keyframes t6{0%,39.36%{opacity:0}39.37%,94%{opacity:1}94.01%,100%{opacity:0}}</style>
+<g style="animation:t6 16s steps(1) infinite" opacity="0"><text x="30" y="244" fill="#8b93a7" xml:space="preserve">● Grep "PaymentError" api/orders.log → 12 matches</text></g><style>@keyframes t7{0%,45.30%{opacity:0}45.31%,94%{opacity:1}94.01%,100%{opacity:0}}</style>
+<g style="animation:t7 16s steps(1) infinite" opacity="0"><text x="30" y="271" fill="#6b7385" xml:space="preserve">  … 140 messages later …</text></g><style>@keyframes t8{0%,51.24%{opacity:0}51.25%,94%{opacity:1}94.01%,100%{opacity:0}}</style>
+<g style="animation:t8 16s steps(1) infinite" opacity="0"><text x="30" y="298" fill="#ff5c8a" xml:space="preserve">[rubi] Context at 121k of 150k. Saving a handoff before compaction.</text></g><style>@keyframes t9{0%,57.18%{opacity:0}57.19%,94%{opacity:1}94.01%,100%{opacity:0}}</style>
+<g style="animation:t9 16s steps(1) infinite" opacity="0"><text x="30" y="325" fill="#3ccf91" xml:space="preserve">✓ Handoff saved → vault/shop/handoffs/2026-10-17-1530.md</text></g><style>@keyframes t10{0%,63.12%{opacity:0}63.12%,94%{opacity:1}94.01%,100%{opacity:0}}</style>
+<g style="animation:t10 16s steps(1) infinite" opacity="0"><text x="30" y="352" fill="#8b93a7" xml:space="preserve">● Conversation compacted (150k → 61k)</text></g><style>@keyframes t11{0%,69.05%{opacity:0}69.06%,94%{opacity:1}94.01%,100%{opacity:0}}</style>
+<g style="animation:t11 16s steps(1) infinite" opacity="0"><text x="30" y="379" fill="#3ccf91" xml:space="preserve">✓ [rubi] Handoff restored. Next step: tests for the coupon edge case.</text></g></g>
+<rect class="cur" x="30" y="392" width="9" height="17" fill="#ff5c8a"/>
+</g>
+</svg>

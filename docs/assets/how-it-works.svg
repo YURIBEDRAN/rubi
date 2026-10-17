@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 470" width="1200" height="470" role="img" aria-label="How Rubi works: meter, handoff, compaction, record, restore">
+<defs><clipPath id="r"><rect width="1200" height="470" rx="24"/></clipPath>
+<clipPath id="track"><rect x="120" y="120" width="960" height="34" rx="17"/></clipPath>
+<linearGradient id="fill" x1="0" x2="1"><stop offset="0" stop-color="#a3123f"/><stop offset="1" stop-color="#ff5c8a"/></linearGradient></defs>
+<style>
+.bar{animation:bar 12s ease-in-out infinite}
+@keyframes bar{0.00%{width:48.0px}25.00%{width:768.0px}37.50%{width:768.0px}50.00%{width:960.0px}62.50%{width:960.0px}75.00%{width:384.0px}100.00%{width:384.0px}}
+</style>
+<g clip-path="url(#r)">
+<rect width="1200" height="470" fill="#0b0d12"/>
+<text x="120" y="98" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif" font-size="14" font-weight="700" fill="#8b93a7" letter-spacing="1.5">CONTEXT WINDOW</text>
+<text x="1080" y="98" text-anchor="end" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="13" fill="#6b7385">compacts at 150k</text>
+<rect x="120" y="120" width="960" height="34" rx="17" fill="#12151c" stroke="#252a36"/>
+<g clip-path="url(#track)"><rect class="bar" x="120" y="120" height="34" width="40" fill="url(#fill)"/></g>
+<line x1="888.0" y1="112" x2="888.0" y2="162" stroke="#f5b84a" stroke-width="2" stroke-dasharray="4 3"/>
+<text x="888.0" y="178" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="12" fill="#f5b84a">80% · handoff</text>
+<text x="600.0" y="200" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#f5b84a" opacity="0" style="animation:l30 12s linear infinite">[rubi] context at 120k of 150k → save a handoff now</text>
+<style>@keyframes l30{0%,24.90%{opacity:0}25.00%,37.50%{opacity:1}37.60%,100%{opacity:0}}</style>
+<text x="600.0" y="200" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#ff5c8a" opacity="0" style="animation:l45 12s linear infinite">auto-compacting… [rubi] recording requests, files, commands → vault</text>
+<style>@keyframes l45{0%,37.40%{opacity:0}37.50%,62.50%{opacity:1}62.60%,100%{opacity:0}}</style>
+<text x="600.0" y="200" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="15" fill="#3ccf91" opacity="0" style="animation:l75 12s linear infinite">✓ handoff restored · back to 60k tokens · same thread</text>
+<style>@keyframes l75{0%,62.40%{opacity:0}62.50%,95.83%{opacity:1}95.93%,100%{opacity:0}}</style>
+
+<g>
+<style>.c0{animation:c0 12s linear infinite}
+@keyframes c0{0%,0.00%{opacity:.38}0.00%,25.00%{opacity:1}25.10%,100%{opacity:.38}}
+.s0{animation:s0 12s linear infinite}
+@keyframes s0{0%,0.00%{stroke:#252a36}0.00%,25.00%{stroke:#e0245e}25.10%,100%{stroke:#252a36}}</style>
+<g class="c0">
+<rect class="s0" x="61.0" y="260" width="206" height="150" rx="14" fill="#12151c" stroke-width="1.5"/>
+<circle cx="87.0" cy="290" r="13" fill="#e0245e" fill-opacity=".18"/><text x="87.0" y="295" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="13" font-weight="700" fill="#ff5c8a">1</text>
+<text x="109.0" y="295" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif" font-size="16" font-weight="700" fill="#e8eaf0">Context grows</text>
+<text font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif" font-size="13.5" fill="#8b93a7"><tspan x="79.0" y="332">every message re-sends</tspan><tspan x="79.0" y="353">the whole conversation</tspan></text>
+</g></g>
+<g>
+<style>.c1{animation:c1 12s linear infinite}
+@keyframes c1{0%,24.90%{opacity:.38}25.00%,37.50%{opacity:1}37.60%,100%{opacity:.38}}
+.s1{animation:s1 12s linear infinite}
+@keyframes s1{0%,24.90%{stroke:#252a36}25.00%,37.50%{stroke:#e0245e}37.60%,100%{stroke:#252a36}}</style>
+<g class="c1">
+<rect class="s1" x="279.0" y="260" width="206" height="150" rx="14" fill="#12151c" stroke-width="1.5"/>
+<circle cx="305.0" cy="290" r="13" fill="#e0245e" fill-opacity=".18"/><text x="305.0" y="295" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="13" font-weight="700" fill="#ff5c8a">2</text>
+<text x="327.0" y="295" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif" font-size="16" font-weight="700" fill="#e8eaf0">Meter at 80%</text>
+<text font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif" font-size="13.5" fill="#8b93a7"><tspan x="297.0" y="332">Claude saves a handoff:</tspan><tspan x="297.0" y="353">goal, decisions, next step</tspan></text>
+</g></g>
+<g>
+<style>.c2{animation:c2 12s linear infinite}
+@keyframes c2{0%,37.40%{opacity:.38}37.50%,50.00%{opacity:1}50.10%,100%{opacity:.38}}
+.s2{animation:s2 12s linear infinite}
+@keyframes s2{0%,37.40%{stroke:#252a36}37.50%,50.00%{stroke:#e0245e}50.10%,100%{stroke:#252a36}}</style>
+<g class="c2">
+<rect class="s2" x="497.0" y="260" width="206" height="150" rx="14" fill="#12151c" stroke-width="1.5"/>
+<circle cx="523.0" cy="290" r="13" fill="#e0245e" fill-opacity=".18"/><text x="523.0" y="295" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="13" font-weight="700" fill="#ff5c8a">3</text>
+<text x="545.0" y="295" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif" font-size="16" font-weight="700" fill="#e8eaf0">Auto-compact</text>
+<text font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif" font-size="13.5" fill="#8b93a7"><tspan x="515.0" y="332">Claude Code compacts on</tspan><tspan x="515.0" y="353">its own at 150k</tspan></text>
+</g></g>
+<g>
+<style>.c3{animation:c3 12s linear infinite}
+@keyframes c3{0%,49.90%{opacity:.38}50.00%,62.50%{opacity:1}62.60%,100%{opacity:.38}}
+.s3{animation:s3 12s linear infinite}
+@keyframes s3{0%,49.90%{stroke:#252a36}50.00%,62.50%{stroke:#e0245e}62.60%,100%{stroke:#252a36}}</style>
+<g class="c3">
+<rect class="s3" x="715.0" y="260" width="206" height="150" rx="14" fill="#12151c" stroke-width="1.5"/>
+<circle cx="741.0" cy="290" r="13" fill="#e0245e" fill-opacity=".18"/><text x="741.0" y="295" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="13" font-weight="700" fill="#ff5c8a">4</text>
+<text x="763.0" y="295" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif" font-size="16" font-weight="700" fill="#e8eaf0">Record</text>
+<text font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif" font-size="13.5" fill="#8b93a7"><tspan x="733.0" y="332">requests, files and</tspan><tspan x="733.0" y="353">commands → vault</tspan></text>
+</g></g>
+<g>
+<style>.c4{animation:c4 12s linear infinite}
+@keyframes c4{0%,62.40%{opacity:.38}62.50%,87.50%{opacity:1}87.60%,100%{opacity:.38}}
+.s4{animation:s4 12s linear infinite}
+@keyframes s4{0%,62.40%{stroke:#252a36}62.50%,87.50%{stroke:#e0245e}87.60%,100%{stroke:#252a36}}</style>
+<g class="c4">
+<rect class="s4" x="933.0" y="260" width="206" height="150" rx="14" fill="#12151c" stroke-width="1.5"/>
+<circle cx="959.0" cy="290" r="13" fill="#e0245e" fill-opacity=".18"/><text x="959.0" y="295" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="13" font-weight="700" fill="#ff5c8a">5</text>
+<text x="981.0" y="295" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif" font-size="16" font-weight="700" fill="#e8eaf0">Restore</text>
+<text font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif" font-size="13.5" fill="#8b93a7"><tspan x="951.0" y="332">handoff injected back,</tspan><tspan x="951.0" y="353">work continues from ~60k</tspan></text>
+</g></g>
+</g>
+</svg>

@@ -1,11 +1,13 @@
 {
   "name": "rubi",
   "version": "0.2.0",
-  "description": "Gaste menos token sem perder o fio: compactação cedo com handoff automático, memória em markdown (Obsidian), guarda de leitura e raio-X de gasto.",
+  "description": "Keeps Claude sessions short without losing the thread: early compaction with automatic handoffs, a markdown memory vault (Obsidian), a read guard and a token X-ray.",
   "type": "module",
   "license": "MIT",
   "author": "Yuri Bedran",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "test": "node --test test/plugin.test.mjs",
     "instalar": "node scripts/instalar.mjs",

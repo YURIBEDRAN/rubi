@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rubi · Interactive demo</title>
+<meta name="description" content="Watch a Claude Code session with and without Rubi: context size, compaction, handoffs and token cost, side by side.">
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #12151c; --panel-2: #181c25; --line: #252a36;
+    --text: #e8eaf0; --muted: #8b93a7; --ruby: #e0245e; --ruby-2: #ff5c8a; --ruby-soft: rgba(224,36,94,.14);
+    --gray: #6b7385; --ok: #3ccf91; --warn: #f5b84a;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+  a { color: var(--ruby-2); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+  header { padding: 56px 0 24px; text-align: center; position: relative; overflow: hidden; }
+  header::before { content: ""; position: absolute; inset: -40% -10% auto; height: 420px;
+    background: radial-gradient(closest-side, rgba(224,36,94,.25), transparent); pointer-events: none; }
+  .gem { width: 56px; height: 56px; }
+  h1 { font-size: clamp(36px, 6vw, 56px); margin: 12px 0 8px; letter-spacing: -.02em; }
+  .tag { color: var(--muted); font-size: clamp(16px, 2.2vw, 20px); margin: 0 auto; max-width: 680px; line-height: 1.5; }
+  .tag b { color: var(--text); }
+  .cta { margin-top: 22px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--text); text-decoration: none; font-weight: 600; font-size: 14px; cursor: pointer; }
+  .btn.primary { background: var(--ruby); border-color: var(--ruby); color: #fff; }
+  .btn:hover { filter: brightness(1.12); }
+
+  section { padding: 28px 0; }
+  h2 { font-size: 26px; margin: 0 0 6px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0 0 18px; line-height: 1.5; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
+  .sim { padding: 18px; }
+  .controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 18px; margin-bottom: 16px; }
+  .ctl label { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+  .ctl label b { color: var(--text); font-family: var(--mono); font-weight: 600; }
+  input[type=range] { width: 100%; accent-color: var(--ruby); }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .bar .spacer { flex: 1; }
+  .speed { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .speed button { background: transparent; color: var(--muted); border: 0; padding: 9px 12px; font: 600 13px var(--sans); cursor: pointer; }
+  .speed button.on { background: var(--panel-2); color: var(--text); }
+
+  .grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; }
+  .chart { position: relative; padding: 12px; }
+  canvas { width: 100%; height: 300px; display: block; }
+  .legend { display: flex; gap: 16px; font-size: 12.5px; color: var(--muted); padding: 2px 4px 0; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+
+  .meters { display: grid; gap: 12px; }
+  .meter { padding: 14px; }
+  .meter h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); display: flex; justify-content: space-between; }
+  .meter h3 span { font-family: var(--mono); color: var(--text); text-transform: none; letter-spacing: 0; }
+  .track { height: 14px; background: var(--panel-2); border-radius: 7px; overflow: hidden; position: relative; }
+  .fill { height: 100%; width: 0; border-radius: 7px; transition: width .12s linear; }
+  .fill.gray { background: linear-gradient(90deg, #4b5263, #8b93a7); }
+  .fill.ruby { background: linear-gradient(90deg, #a3123f, var(--ruby-2)); }
+  .tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--warn); opacity: .9; }
+  .nums { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+  .nums b { color: var(--text); font-family: var(--mono); }
+  .save { padding: 16px; text-align: center; }
+  .save .big { font-size: 44px; font-weight: 800; color: var(--ruby-2); font-family: var(--mono); letter-spacing: -.02em; }
+  .save p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+
+  .log { margin-top: 14px; padding: 12px 14px; font: 12.5px/1.65 var(--mono); height: 168px; overflow: hidden; position: relative; }
+  .log::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 30px; background: linear-gradient(var(--panel), transparent); }
+  .log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: in .25s ease-out; }
+  .log .t { color: var(--gray); }
+  .log .r { color: var(--ruby-2); }
+  .log .o { color: var(--ok); }
+  .log .w { color: var(--warn); }
+  @keyframes in { from { opacity: 0; transform: translateY(4px); } }
+
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; counter-reset: s; }
+  .step { padding: 16px; position: relative; }
+  .step::before { counter-increment: s; content: counter(s); position: absolute; top: 14px; right: 14px; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--ruby-soft); color: var(--ruby-2); font: 700 13px/26px var(--mono); text-align: center; }
+  .step h4 { margin: 0 0 6px; font-size: 15px; padding-right: 30px; }
+  .step p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+  .step code { font-family: var(--mono); font-size: 12px; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; color: var(--text); }
+
+  .tabs { display: flex; gap: 6px; padding: 12px 12px 0; flex-wrap: wrap; }
+  .tabs button { background: transparent; border: 1px solid transparent; color: var(--muted); padding: 8px 12px; border-radius: 9px; font: 600 13.5px var(--sans); cursor: pointer; }
+  .tabs button.on { background: var(--panel-2); border-color: var(--line); color: var(--text); }
+  .pane { display: none; padding: 14px 16px 18px; }
+  .pane.on { display: block; }
+  .pane ol { margin: 0; padding-left: 20px; color: var(--muted); line-height: 1.7; font-size: 14px; }
+  .pane ol b { color: var(--text); }
+  pre { position: relative; background: #07080c; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 8px 0 12px;
+    font: 13px/1.6 var(--mono); color: #d6d9e2; overflow-x: auto; }
+  pre .p { color: var(--ruby-2); user-select: none; }
+  .copy { position: absolute; top: 8px; right: 8px; font: 600 11.5px var(--sans); background: var(--panel-2); color: var(--muted);
+    border: 1px solid var(--line); border-radius: 7px; padding: 4px 8px; cursor: pointer; }
+
+  footer { color: var(--muted); font-size: 13px; text-align: center; padding: 30px 0 50px; }
+
+  @media (max-width: 860px) {
+    .controls { grid-template-columns: repeat(2, 1fr); }
+    .grid { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 520px) {
+    .controls, .steps { grid-template-columns: 1fr; }
+    canvas { height: 240px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <svg class="gem" viewBox="0 0 64 64" aria-hidden="true">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff5c8a"/><stop offset="1" stop-color="#9b113e"/></linearGradient></defs>
+      <path d="M14 8h36l12 16-30 34L2 24z" fill="url(#g)"/>
+      <path d="M2 24h60M14 8l8 16 10 34 10-34 8-16M22 24l10-16 10 16" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>
+    </svg>
+    <h1>Rubi</h1>
+    <p class="tag"><b>Only what's precious stays in context.</b> Rubi keeps Claude sessions short on its own, saves a handoff before every compaction and brings it back right after. You spend fewer tokens and never lose the thread.</p>
+    <div class="cta">
+      <a class="btn primary" href="#demo">▶ Watch the demo</a>
+      <a class="btn" href="#install">Install</a>
+      <a class="btn" href="https://github.com/YURIBEDRAN/rubi">GitHub</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="demo">
+    <h2>One session, two timelines</h2>
+    <p class="sub">Every message re-sends the whole conversation. Watch the same long session with and without Rubi. Drag the sliders to match how you work.</p>
+    <div class="card sim">
+      <div class="controls">
+        <div class="ctl"><label>Messages in the session <b id="v-turns"></b></label><input id="turns" type="range" min="100" max="1000" step="50" value="600"></div>
+        <div class="ctl"><label>Tokens added per message <b id="v-per"></b></label><input id="per" type="range" min="500" max="4000" step="250" value="1500"></div>
+        <div class="ctl"><label>Fixed context at start <b id="v-base"></b></label><input id="base" type="range" min="10000" max="100000" step="2000" value="48000"></div>
+        <div class="ctl"><label>Rubi compacts at <b id="v-win"></b></label><input id="win" type="range" min="100000" max="400000" step="10000" value="150000"></div>
+      </div>
+      <div class="bar">
+        <button class="btn primary" id="play">▶ Play</button>
+        <button class="btn" id="reset">↺ Reset</button>
+        <div class="spacer"></div>
+        <div class="speed" id="speed"><button data-s="1">1×</button><button data-s="3" class="on">3×</button><button data-s="10">10×</button></div>
+      </div>
+      <div class="grid">
+        <div class="card chart">
+          <canvas id="chart" aria-label="Context size per message, with and without Rubi"></canvas>
+          <div class="legend"><span><i style="background:#8b93a7"></i>Without Rubi</span><span><i style="background:#ff5c8a"></i>With Rubi</span><span><i style="background:#f5b84a;height:2px"></i>Handoff saved (80%)</span></div>
+        </div>
+        <div class="meters">
+          <div class="card meter">
+            <h3>Without Rubi <span id="m-ctx-a">0</span></h3>
+            <div class="track"><div class="fill gray" id="f-a"></div></div>
+            <div class="nums"><span>Cost so far <b id="c-a">0</b></span><span>Compactions <b id="k-a">0</b></span></div>
+          </div>
+          <div class="card meter">
+            <h3>With Rubi <span id="m-ctx-b">0</span></h3>
+            <div class="track"><div class="fill ruby" id="f-b"></div><div class="tick" id="tick"></div></div>
+            <div class="nums"><span>Cost so far <b id="c-b">0</b></span><span>Handoffs <b id="k-b">0</b></span></div>
+          </div>
+          <div class="card save">
+            <div class="big" id="saved">0%</div>
+            <p>fewer tokens billed in this session</p>
+          </div>
+        </div>
+      </div>
+      <div class="card log" id="log" aria-live="polite"></div>
+    </div>
+    <p class="sub" style="margin-top:10px;font-size:13px">Cost is in input-token equivalents (cache read 0.1×, cache write 1.25×, output 5×) using Anthropic's price ratios, so it holds for any model or plan. Across 30 days of real usage (284 sessions, short ones included), the measured saving was about one third.</p>
+  </section>
+
+  <section>
+    <h2>How it works</h2>
+    <p class="sub">Four hooks and a markdown vault. No server, no database, no dependencies beyond Node.</p>
+    <div class="steps">
+      <div class="card step"><h4>Compact early</h4><p>Claude Code compacts on its own at <code>150k</code> instead of near <code>1M</code>. You never type <code>/clear</code>.</p></div>
+      <div class="card step"><h4>Meter</h4><p>At 80% of the window, a hook tells Claude to save a <b>handoff</b>: goal, decisions, key files, next step.</p></div>
+      <div class="card step"><h4>Record</h4><p>Right before compaction, Rubi writes what's about to vanish: your requests, files changed, commands run.</p></div>
+      <div class="card step"><h4>Restore</h4><p>Right after, the handoff is injected back. Claude carries on from ~60k tokens instead of 500k+.</p></div>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Install</h2>
+    <p class="sub">Pick where you use Claude.</p>
+    <div class="card">
+      <div class="tabs" role="tablist">
+        <button class="on" data-p="cc">Claude Code</button>
+        <button data-p="desk">Claude Desktop</button>
+        <button data-p="web">claude.ai &amp; mobile</button>
+      </div>
+      <div class="pane on" id="p-cc">
+        <ol><li><b>Add and install the plugin</b> inside Claude Code:</li></ol>
+        <pre><span class="p">&gt; </span>/plugin marketplace add YURIBEDRAN/rubi
+<span class="p">&gt; </span>/plugin install rubi@rubi<button class="copy">Copy</button></pre>
+        <ol start="2"><li><b>Turn on early compaction</b> and pick your vault folder:</li></ol>
+        <pre><span class="p">$ </span>git clone https://github.com/YURIBEDRAN/rubi &amp;&amp; cd rubi
+<span class="p">$ </span>node scripts/instalar.mjs<button class="copy">Copy</button></pre>
+        <ol start="3"><li><b>That's it.</b> Work normally. Try <code>/rubi:raio-x</code> to see where your tokens go.</li></ol>
+      </div>
+      <div class="pane" id="p-desk">
+        <ol>
+          <li>Download <b>rubi.mcpb</b> from <a href="https://github.com/YURIBEDRAN/rubi/releases/latest">Releases</a>.</li>
+          <li>Open it with Claude Desktop and choose a vault folder (an Obsidian vault works).</li>
+          <li>Also upload the <b>rubi.zip</b> skill (see the next tab). It teaches Claude when to hand off.</li>
+        </ol>
+      </div>
+      <div class="pane" id="p-web">
+        <ol>
+          <li>Download <b>rubi.zip</b> from <a href="https://github.com/YURIBEDRAN/rubi/releases/latest">Releases</a>.</li>
+          <li>On claude.ai: <b>Settings → Capabilities → Skills → Upload skill</b>.</li>
+          <li>When a chat gets long, Claude offers a handoff you paste into a fresh chat. Want it saved for real, on your phone too? Self-host the connector:</li>
+        </ol>
+        <pre><span class="p">$ </span>RUBI_TOKEN=$(openssl rand -hex 24) node scripts/mcp-server.mjs --http<button class="copy">Copy</button></pre>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>MIT · <a href="https://github.com/YURIBEDRAN/rubi">github.com/YURIBEDRAN/rubi</a> · Inspired by <a href="https://github.com/akitaonrails/ai-memory">ai-memory</a></footer>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const NATIVE = 967000, HANDOFF = 1500, SUMMARY = 8000, OUT = 500;
+  const k = (n) => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e4 ? Math.round(n / 1e3) + 'k' : n >= 1e3 ? +(n / 1e3).toFixed(1) + 'k' : String(Math.round(n));
+
+  function simulate(p) {
+    const run = (rubi) => {
+      let ctx = p.base, cost = 0, comps = 0, handoffs = 0, warned = false;
+      const ctxs = [], costs = [], events = [];
+      for (let t = 1; t <= p.turns; t++) {
+        cost += ctx * 0.1 + p.per * 1.25 + OUT * 5;
+        ctx += p.per;
+        if (rubi && !warned && ctx >= p.win * 0.8) { warned = true; handoffs++; cost += HANDOFF * 5; events.push({ t, type: 'handoff', ctx }); }
+        if (ctx >= (rubi ? p.win : NATIVE)) {
+          events.push({ t, type: 'compact', ctx });
+          cost += ctx * 0.1 + SUMMARY * 5 + (p.base + 12000) * 1.25;
+          ctx = p.base + 12000; comps++; warned = false;
+          if (rubi) events.push({ t, type: 'restore', ctx });
+        }
+        ctxs.push(ctx); costs.push(cost);
+      }
+      return { ctxs, costs, events, comps, handoffs };
+    };
+    return { a: run(false), b: run(true) };
+  }
+
+  // ---- state ----
+  const P = { turns: 600, per: 1500, base: 48000, win: 150000 };
+  let S = simulate(P), step = 0, playing = false, speed = 3, raf = 0, acc = 0, last = 0;
+
+  const sliders = { turns: (v) => v, per: (v) => k(v), base: (v) => k(v), win: (v) => k(v) };
+  for (const id of Object.keys(sliders)) {
+    const el = $(id);
+    const show = () => ($('v-' + id).textContent = sliders[id](+el.value));
+    show();
+    el.addEventListener('input', () => { P[id] = +el.value; show(); S = simulate(P); if (!playing) { step = P.turns; render(); summary(); } else draw(); });
+  }
+  document.querySelectorAll('#speed button').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('#speed button').forEach((x) => x.classList.toggle('on', x === b)); speed = +b.dataset.s;
+  }));
+
+  // ---- chart ----
+  const cv = $('chart'), cx = cv.getContext('2d');
+  function size() {
+    const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    cv.width = r.width * d; cv.height = r.height * d; cx.setTransform(d, 0, 0, d, 0, 0);
+  }
+  function draw() {
+    const W = cv.clientWidth, H = cv.clientHeight, L = 46, R = 10, T = 12, B = 26;
+    cx.clearRect(0, 0, W, H);
+    const maxY = Math.max(...S.a.ctxs, P.win) * 1.05;
+    const x = (t) => L + (t / P.turns) * (W - L - R), y = (v) => T + (1 - v / maxY) * (H - T - B);
+    cx.font = '11px ui-monospace, Consolas, monospace'; cx.fillStyle = '#6b7385'; cx.strokeStyle = '#252a36'; cx.lineWidth = 1;
+    for (const v of [0, 250e3, 500e3, 750e3, 1e6]) {
+      if (v > maxY) break;
+      cx.beginPath(); cx.moveTo(L, y(v)); cx.lineTo(W - R, y(v)); cx.stroke();
+      cx.textAlign = 'right'; cx.fillText(k(v), L - 6, y(v) + 4);
+    }
+    cx.textAlign = 'center';
+    for (let i = 0; i <= 4; i++) { const t = Math.round((P.turns * i) / 4); cx.fillText(i ? t : 'msg 0', x(t), H - 8); }
+    // handoff line
+    cx.setLineDash([4, 4]); cx.strokeStyle = 'rgba(245,184,74,.55)';
+    cx.beginPath(); cx.moveTo(L, y(P.win * 0.8)); cx.lineTo(W - R, y(P.win * 0.8)); cx.stroke(); cx.setLineDash([]);
+    const n = Math.max(1, Math.min(step, P.turns));
+    const line = (arr, color, fill) => {
+      cx.beginPath(); cx.moveTo(x(0), y(P.base));
+      for (let i = 0; i < n; i++) cx.lineTo(x(i + 1), y(arr[i]));
+      cx.strokeStyle = color; cx.lineWidth = 2.2; cx.lineJoin = 'round'; cx.stroke();
+      if (fill) { cx.lineTo(x(n), y(0)); cx.lineTo(x(0), y(0)); cx.closePath(); cx.fillStyle = fill; cx.fill(); }
+    };
+    line(S.a.ctxs, '#8b93a7', 'rgba(139,147,167,.08)');
+    line(S.b.ctxs, '#ff5c8a', 'rgba(224,36,94,.12)');
+    for (const e of S.b.events) if (e.t <= n && e.type === 'handoff') {
+      cx.fillStyle = '#f5b84a'; cx.beginPath(); cx.arc(x(e.t), y(e.ctx), 3.2, 0, 7); cx.fill();
+    }
+  }
+
+  // ---- meters + log ----
+  const logEl = $('log');
+  function log(html, cls) {
+    const d = document.createElement('div'); d.innerHTML = html; if (cls) d.className = cls;
+    logEl.appendChild(d); while (logEl.children.length > 40) logEl.firstChild.remove();
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function render() {
+    const i = Math.max(0, Math.min(step, P.turns) - 1);
+    const a = S.a.ctxs[i] ?? P.base, b = S.b.ctxs[i] ?? P.base;
+    $('m-ctx-a').textContent = k(a) + ' tokens'; $('m-ctx-b').textContent = k(b) + ' tokens';
+    $('f-a').style.width = Math.min(100, (a / NATIVE) * 100) + '%';
+    $('f-b').style.width = Math.min(100, (b / NATIVE) * 100) + '%';
+    $('tick').style.left = (P.win / NATIVE) * 100 + '%';
+    const ca = S.a.costs[i] ?? 0, cb = S.b.costs[i] ?? 0;
+    $('c-a').textContent = k(ca); $('c-b').textContent = k(cb);
+    $('k-a').textContent = S.a.events.filter((e) => e.t <= step && e.type === 'compact').length;
+    $('k-b').textContent = S.b.events.filter((e) => e.t <= step && e.type === 'handoff').length;
+    $('saved').textContent = ca ? Math.max(0, Math.round((1 - cb / ca) * 100)) + '%' : '0%';
+    draw();
+  }
+  function summary() {
+    logEl.innerHTML = '';
+    log(`<span class="t">session · ${P.turns} messages · ${k(P.per)}/message · start ${k(P.base)}</span>`);
+    log(`<span class="r">[rubi]</span> ${S.b.handoffs} handoffs saved · ${S.b.comps} early compactions`);
+    log(`<span class="t">without rubi</span> peak ${k(Math.max(...S.a.ctxs))} tokens · ${S.a.comps} compactions`);
+    const s = Math.round((1 - S.b.costs.at(-1) / S.a.costs.at(-1)) * 100);
+    log(`<span class="o">✓ ${s}% fewer tokens billed</span> (${k(S.b.costs.at(-1))} vs ${k(S.a.costs.at(-1))})`);
+  }
+
+  const files = ['src/auth/login.ts', 'api/routes.ts', 'db/schema.sql', 'web/Checkout.tsx', 'tests/login.spec.ts', 'README.md'];
+  function narrate(t) {
+    for (const e of S.b.events) {
+      if (e.t !== t) continue;
+      if (e.type === 'handoff') {
+        log(`<span class="t">msg ${t}</span> <span class="r">[rubi]</span> context at ${k(e.ctx)} of ${k(P.win)}: <span class="w">save a handoff now</span>`);
+        log(`<span class="t">msg ${t}</span> <span class="o">✓ handoff saved</span> → vault/my-app/handoffs/${String(t).padStart(4, '0')}.md`);
+      }
+      if (e.type === 'compact') log(`<span class="t">msg ${t}</span> <span class="r">[rubi]</span> recorded ${2 + (t % 4)} requests, ${files[t % files.length]} +${t % 5 + 1} files → sessoes/`);
+      if (e.type === 'restore') log(`<span class="t">msg ${t}</span> <span class="o">✓ compacted · handoff restored</span> → back to ${k(e.ctx)} tokens`);
+    }
+    for (const e of S.a.events) if (e.t === t && e.type === 'compact') log(`<span class="t">msg ${t}</span> without rubi: native compaction at ${k(e.ctx)} <span class="w">(generic summary, details lost)</span>`);
+  }
+
+  function tick(now) {
+    if (!playing) return;
+    acc += ((now - last) / 1000) * speed * 12; last = now;
+    while (acc >= 1 && step < P.turns) { step++; acc--; narrate(step); }
+    render();
+    if (step >= P.turns) { playing = false; $('play').textContent = '▶ Replay'; log('<span class="o">— end of session —</span>'); return; }
+    raf = requestAnimationFrame(tick);
+  }
+  function play() {
+    if (playing) { playing = false; $('play').textContent = '▶ Resume'; return; }
+    if (step >= P.turns) { step = 0; logEl.innerHTML = ''; render(); }
+    if (step === 0) log(`<span class="t">msg 0</span> session starts with ${k(P.base)} tokens of fixed context`);
+    playing = true; $('play').textContent = '❚❚ Pause'; last = performance.now(); acc = 0; raf = requestAnimationFrame(tick);
+  }
+  $('play').addEventListener('click', play);
+  $('reset').addEventListener('click', () => { playing = false; cancelAnimationFrame(raf); step = 0; logEl.innerHTML = ''; $('play').textContent = '▶ Play'; render(); });
+
+  // ---- tabs + copy ----
+  document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('on', p.id === 'p-' + b.dataset.p));
+  }));
+  document.querySelectorAll('.copy').forEach((b) => b.addEventListener('click', () => {
+    const txt = [...b.parentElement.childNodes].filter((n) => n !== b && !(n.classList && n.classList.contains('p'))).map((n) => n.textContent).join('');
+    navigator.clipboard?.writeText(txt.trim()).then(() => { b.textContent = 'Copied'; setTimeout(() => (b.textContent = 'Copy'), 1200); });
+  }));
+
+  window.addEventListener('resize', () => { size(); draw(); });
+  size(); step = P.turns; render(); summary(); $('play').textContent = '▶ Play the session';
+  if (location.hash === '#autoplay') { speed = 10; play(); }
+})();
+</script>
+</body>
+</html>

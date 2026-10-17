@@ -3,9 +3,12 @@
   "name": "rubi",
   "display_name": "Rubi",
   "version": "0.2.0",
-  "description": "Memória persistente em markdown pro Claude Desktop: salva o 'onde paramos' e continua numa conversa nova sem perder o fio.",
-  "long_description": "Guarda notas e handoffs num vault markdown (abre no Obsidian). Quando a conversa fica longa, o Claude salva um handoff e você continua numa conversa nova gastando bem menos do seu limite de uso.",
-  "author": { "name": "Yuri Bedran", "url": "https://github.com/YURIBEDRAN" },
+  "description": "Persistent markdown memory for Claude Desktop: save where you left off and continue in a fresh chat without losing the thread.",
+  "long_description": "Keeps notes and handoffs in a markdown vault (opens in Obsidian). When a chat gets long, Claude saves a handoff and you continue in a new chat, spending far less of your usage limit.",
+  "author": {
+    "name": "Yuri Bedran",
+    "url": "https://github.com/YURIBEDRAN"
+  },
   "homepage": "https://github.com/YURIBEDRAN/rubi",
   "license": "MIT",
   "server": {
@@ -13,26 +16,58 @@
     "entry_point": "server/mcp-server.mjs",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/server/mcp-server.mjs"],
-      "env": { "RUBI_VAULT": "${user_config.vault}", "RUBI_MODO": "app" }
+      "args": [
+        "${__dirname}/server/mcp-server.mjs"
+      ],
+      "env": {
+        "RUBI_VAULT": "${user_config.vault}",
+        "RUBI_MODO": "app"
+      }
     }
   },
   "tools": [
-    { "name": "rubi_buscar", "description": "Busca nas notas e handoffs" },
-    { "name": "rubi_ler", "description": "Lê uma nota do vault" },
-    { "name": "rubi_salvar_nota", "description": "Salva conhecimento durável" },
-    { "name": "rubi_salvar_handoff", "description": "Salva o 'onde paramos'" },
-    { "name": "rubi_ultimo_handoff", "description": "Devolve o último handoff" },
-    { "name": "rubi_projetos", "description": "Lista os projetos do vault" }
+    {
+      "name": "rubi_buscar",
+      "description": "Busca nas notas e handoffs"
+    },
+    {
+      "name": "rubi_ler",
+      "description": "Lê uma nota do vault"
+    },
+    {
+      "name": "rubi_salvar_nota",
+      "description": "Salva conhecimento durável"
+    },
+    {
+      "name": "rubi_salvar_handoff",
+      "description": "Salva o 'onde paramos'"
+    },
+    {
+      "name": "rubi_ultimo_handoff",
+      "description": "Devolve o último handoff"
+    },
+    {
+      "name": "rubi_projetos",
+      "description": "Lista os projetos do vault"
+    }
   ],
   "user_config": {
     "vault": {
       "type": "directory",
-      "title": "Pasta do vault",
-      "description": "Onde as notas ficam. Pode ser a pasta de um vault do Obsidian.",
+      "title": "Vault folder",
+      "description": "Where notes are stored. Can be an Obsidian vault.",
       "required": true,
       "default": "${HOME}/rubi-vault"
     }
   },
-  "compatibility": { "platforms": ["win32", "darwin", "linux"], "runtimes": { "node": ">=18.0.0" } }
+  "compatibility": {
+    "platforms": [
+      "win32",
+      "darwin",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
 }
