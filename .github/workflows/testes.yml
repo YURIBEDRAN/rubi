@@ -1,0 +1,42 @@
+name: testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  testes:
+    name: ${{ matrix.os }} · node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --test test/plugin.test.mjs
+      - name: indexar o próprio repositório
+        run: node scripts/indexar.mjs .
+      - name: servidor MCP em modo app (como no Claude Desktop)
+        shell: bash
+        run: |
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            | RUBI_MODO=app RUBI_VAULT="$RUNNER_TEMP/vault" timeout 10 node scripts/mcp-server.mjs > saida.txt || true
+          grep -q '"rubi_contexto"' saida.txt
+
+  pacotes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx -y @anthropic-ai/mcpb validate app/desktop/manifest.json
+      - run: node scripts/empacotar.mjs
+      - run: npx -y @anthropic-ai/mcpb info dist/rubi.mcpb
