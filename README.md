@@ -1,4 +1,4 @@
-# 💎 Rubi
+# Rubi
 
 > **Só o que vale ouro fica no contexto.**
 
