@@ -233,9 +233,13 @@ test('MCP HTTP (app): exige token, guarda por projeto no vault e não expõe rai
   assert.equal(await post('http://127.0.0.1:18787/mcp/errado', {}), 404);
   const nomes = (await post(url, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).result.tools.map((f) => f.name);
   assert.ok(nomes.includes('rubi_projetos') && !nomes.includes('rubi_raio_x'));
+  fs.mkdirSync(path.join(env.RUBI_VAULT, 'pasta-qualquer-do-usuario'), { recursive: true });
   await post(url, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'rubi_registrar', arguments: { projeto: 'tcc', fatos: [{ tipo: 'preferencia', titulo: 'Citações em ABNT', texto: 'A orientadora exige ABNT.' }] } } });
   const r = await post(url, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'rubi_contexto', arguments: { projeto: 'tcc', pergunta: 'formato das referências', termos: ['citação', 'abnt', 'norma'] } } });
+  const lista = await post(url, { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'rubi_projetos', arguments: {} } });
   p.kill();
+  assert.match(lista.result.content[0].text, /tcc/);
+  assert.doesNotMatch(lista.result.content[0].text, /pasta-qualquer/, 'pasta sem memória do Rubi não é projeto');
   assert.match(r.result.content[0].text, /Citações em ABNT/);
   assert.ok(fs.existsSync(path.join(env.RUBI_VAULT, 'tcc', 'conhecimento', 'preferencia-citacoes-em-abnt.md')));
 });

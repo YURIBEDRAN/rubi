@@ -114,9 +114,10 @@ export function lerDaMemoria(m, caminho) {
 export function listarProjetosApp() {
   const v = lerConfig().vault;
   try {
+    // só pastas com a estrutura do Rubi: o vault pode ser uma pasta com outras coisas (ex.: Downloads)
     return fs.readdirSync(v, { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith('.')).map((e) => {
       const n = (s) => listarMd(path.join(v, e.name, s)).length;
       return { projeto: e.name, conhecimento: n('conhecimento'), handoffs: n('handoffs') };
-    });
+    }).filter((p) => p.conhecimento || p.handoffs);
   } catch { return []; }
 }

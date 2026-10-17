@@ -18,7 +18,7 @@ const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const MODO_HTTP = args.includes('--http');
 const MODO_APP = MODO_HTTP || process.env.RUBI_MODO === 'app';
-const VERSAO = '0.3.1';
+const VERSAO = '0.3.2';
 
 // Onde ler e escrever: no Claude Code, a pasta .rubi do projeto; no app, o vault.
 function alvo(projeto) {
