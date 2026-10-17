@@ -191,7 +191,7 @@
       <div class="tabs" role="tablist">
         <button class="on" data-p="cc">Claude Code</button>
         <button data-p="desk">Claude Desktop</button>
-        <button data-p="web">claude.ai &amp; mobile</button>
+        <button data-p="web">claude.ai &amp; mobile (soon)</button>
       </div>
       <div class="pane on" id="p-cc">
         <ol><li><b>Add and install the plugin</b> inside Claude Code:</li></ol>
@@ -206,16 +206,14 @@
         <ol>
           <li>Download <b>rubi.mcpb</b> from <a href="https://github.com/YURIBEDRAN/rubi/releases/latest">Releases</a>.</li>
           <li>Open it with Claude Desktop and choose a vault folder (an Obsidian vault works).</li>
-          <li>Also upload the <b>rubi.zip</b> skill (see the next tab). It teaches Claude when to hand off.</li>
+          <li>In the app, Rubi provides the memory: knowledge graph, search and handoffs. The code map and automatic hooks need Claude Code.</li>
         </ol>
       </div>
       <div class="pane" id="p-web">
         <ol>
-          <li>Download <b>rubi.zip</b> from <a href="https://github.com/YURIBEDRAN/rubi/releases/latest">Releases</a>.</li>
-          <li>On claude.ai: <b>Settings → Capabilities → Skills → Upload skill</b>.</li>
-          <li>When a chat gets long, Claude offers a handoff you paste into a fresh chat. Want it saved for real, on your phone too? Self-host the connector:</li>
+          <li><b>Coming soon.</b> Support for the website and the mobile app is in development.</li>
+          <li>Follow the <a href="https://github.com/YURIBEDRAN/rubi">repository</a> to know when it ships.</li>
         </ol>
-        <pre><span class="p">$ </span>RUBI_TOKEN=$(openssl rand -hex 24) node scripts/mcp-server.mjs --http<button class="copy">Copy</button></pre>
       </div>
     </div>
   </section>

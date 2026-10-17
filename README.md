@@ -15,7 +15,7 @@
 <p align="center">
   <img alt="Claude Code plugin" src="https://img.shields.io/badge/Claude%20Code-plugin-e0245e?style=flat-square">
   <img alt="Claude Desktop" src="https://img.shields.io/badge/Claude%20Desktop-extension-e0245e?style=flat-square">
-  <img alt="claude.ai" src="https://img.shields.io/badge/claude.ai-skill-e0245e?style=flat-square">
+  <img alt="claude.ai" src="https://img.shields.io/badge/claude.ai-coming%20soon-8b93a7?style=flat-square">
   <img alt="Zero dependencies" src="https://img.shields.io/badge/dependencies-0-3ccf91?style=flat-square">
   <img alt="Tests" src="https://img.shields.io/badge/tests-12%20passing-3ccf91?style=flat-square">
   <img alt="MIT" src="https://img.shields.io/badge/license-MIT-8b93a7?style=flat-square">
@@ -405,7 +405,7 @@ rubi_registrar → criado: conhecimento/bug-cupom-aplicado-duas-vezes.md
 - **Code map is regex-based**, not a full parser (no tree-sitter, to keep zero dependencies). Imports are resolved for JS/TS (relative and `@/` aliases), Python, Go, Rust, Java/Kotlin, PHP, Ruby, C/C++, CSS and Dart. Dynamic imports and exotic aliases may be missed.
 - **No vector embeddings.** Meaning comes from Claude's own query expansion. For very large knowledge bases (tens of thousands of nodes), an embedding index could be added later; the JSON index can also be swapped for SQLite FTS5.
 - **Hooks cannot run `/clear` or `/compact`**, nor edit Claude Code's compaction summary. Rubi works around it: Claude Code compacts at the threshold you set, and Rubi handles what happens before and after.
-- **The web and mobile apps have no hooks.** There, the skill makes Claude estimate when a chat is long, instead of measuring it.
+- **Platforms.** Fully supported in Claude Code. In the Claude Desktop app, Rubi provides the memory tools but not the hooks or the code map. The website and mobile app are not supported yet.
 
 ---
 
@@ -431,15 +431,13 @@ The installer writes `CLAUDE_CODE_AUTO_COMPACT_WINDOW` (default `150000`) into `
 
 ### Claude Desktop
 
-Download **`rubi.mcpb`** from [Releases](https://github.com/YURIBEDRAN/rubi/releases/latest), open it with Claude Desktop and pick a vault folder. An existing Obsidian vault works. Also upload the `rubi.zip` skill below.
+Download **`rubi.mcpb`** from [Releases](https://github.com/YURIBEDRAN/rubi/releases/latest), open it with Claude Desktop and pick a vault folder. An existing Obsidian vault works.
 
-### claude.ai and mobile
+In the Desktop app Rubi provides the **memory**: the knowledge graph, hybrid search and handoffs. The code map and the automatic hooks (recall, meter, harvest, early compaction) need Claude Code.
 
-- **Skill only (zero setup):** upload **`rubi.zip`** in **Settings → Capabilities → Skills**. When a chat gets long, Claude offers a handoff you paste into a new chat.
-- **Skill + connector (memory saved for real, on your phone too):** run `RUBI_TOKEN=$(openssl rand -hex 24) node scripts/mcp-server.mjs --http` on a server you control, behind HTTPS, and add `https://your-domain/mcp/<RUBI_TOKEN>` in **Settings → Connectors → Add custom connector**.
+### claude.ai and mobile: coming soon
 
-> [!WARNING]
-> Anyone with the connector URL can read and write that memory. Treat it as a password and keep secrets out of the vault.
+Support for the website and the mobile app is in development. The pieces already in this repo (a claude.ai skill in `app/claude-ai/` and an HTTP mode of the MCP server for a self-hosted connector) are **experimental and not yet validated on claude.ai**, so we don't recommend them yet.
 
 ---
 
