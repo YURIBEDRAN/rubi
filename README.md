@@ -39,7 +39,7 @@ We ran Rubi's X-ray on 30 days of real Claude Code usage (284 sessions):
 | Context loaded **before the first message** (median) | **48k** |
 | Cache hit rate | 99% (the cache was fine; the sessions were just too long) |
 
-Simulating the same month with Rubi (compact at 150k, handoff preserved) cut **about one third of the total**. A single long session saves much more, around **60%**:
+Simulating the same month with Rubi (compact at 150k, handoff preserved) cut **about one third of the total**. A single long session saves much more, about **two thirds**:
 
 <p align="center">
   <a href="https://yuribedran.github.io/rubi/"><img src="docs/assets/demo.gif" alt="Interactive demo: the same session with and without Rubi" width="100%"></a>
