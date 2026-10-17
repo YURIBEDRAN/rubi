@@ -1,0 +1,17 @@
+{
+  "name": "memoria-claude",
+  "version": "0.1.0",
+  "description": "Gaste menos token sem perder o fio: compactação cedo com handoff automático, memória em markdown (Obsidian), guarda de leitura e raio-X de gasto.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Yuri Bedran",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node --test test/plugin.test.mjs",
+    "instalar": "node scripts/instalar.mjs",
+    "raio-x": "node scripts/raio-x.mjs",
+    "auditar": "node scripts/auditar.mjs",
+    "empacotar": "node scripts/empacotar.mjs",
+    "servidor": "node scripts/mcp-server.mjs --http"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "manifest_version": "0.2",
+  "name": "memoria-claude",
+  "display_name": "Memória Claude",
+  "version": "0.1.0",
+  "description": "Memória persistente em markdown pro Claude Desktop: salva o 'onde paramos' e continua numa conversa nova sem perder o fio.",
+  "long_description": "Guarda notas e handoffs num vault markdown (abre no Obsidian). Quando a conversa fica longa, o Claude salva um handoff e você continua numa conversa nova gastando bem menos do seu limite de uso.",
+  "author": { "name": "Yuri Bedran", "url": "https://github.com/YURIBEDRAN" },
+  "homepage": "https://github.com/YURIBEDRAN/memoria-claude",
+  "license": "MIT",
+  "server": {
+    "type": "node",
+    "entry_point": "server/mcp-server.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/mcp-server.mjs"],
+      "env": { "MEMORIA_VAULT": "${user_config.vault}", "MEMORIA_MODO": "app" }
+    }
+  },
+  "tools": [
+    { "name": "memoria_buscar", "description": "Busca nas notas e handoffs" },
+    { "name": "memoria_ler", "description": "Lê uma nota do vault" },
+    { "name": "memoria_salvar_nota", "description": "Salva conhecimento durável" },
+    { "name": "memoria_salvar_handoff", "description": "Salva o 'onde paramos'" },
+    { "name": "memoria_ultimo_handoff", "description": "Devolve o último handoff" },
+    { "name": "memoria_projetos", "description": "Lista os projetos do vault" }
+  ],
+  "user_config": {
+    "vault": {
+      "type": "directory",
+      "title": "Pasta do vault",
+      "description": "Onde as notas ficam. Pode ser a pasta de um vault do Obsidian.",
+      "required": true,
+      "default": "${HOME}/memoria-claude-vault"
+    }
+  },
+  "compatibility": { "platforms": ["win32", "darwin", "linux"], "runtimes": { "node": ">=18.0.0" } }
+}
