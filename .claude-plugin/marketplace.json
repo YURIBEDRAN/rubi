@@ -13,6 +13,6 @@
   ],
   "metadata": {
     "description": "Context-saving memory plugins for Claude Code",
-    "version": "0.3.0"
+    "version": "0.3.1"
   }
 }

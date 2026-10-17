@@ -23,7 +23,9 @@ export function lerConfig() {
   let arq = {};
   try { arq = JSON.parse(fs.readFileSync(ARQ_CONFIG, 'utf8')); } catch {}
   const c = { ...PADRAO, ...arq, guarda: { ...PADRAO.guarda, ...(arq.guarda || {}) } };
-  if (process.env.RUBI_VAULT) c.vault = process.env.RUBI_VAULT;
+  // o Claude Desktop pode passar a variável vazia ou sem substituir ("${user_config.vault}") quando o campo fica em branco
+  const v = process.env.RUBI_VAULT;
+  if (v && !v.includes('${')) c.vault = v;
   const janelaEnv = Number(process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW);
   if (janelaEnv > 0) c.janela = janelaEnv;
   c.compactaSozinho = janelaEnv > 0;

@@ -18,7 +18,7 @@ const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const MODO_HTTP = args.includes('--http');
 const MODO_APP = MODO_HTTP || process.env.RUBI_MODO === 'app';
-const VERSAO = '0.3.0';
+const VERSAO = '0.3.1';
 
 // Onde ler e escrever: no Claude Code, a pasta .rubi do projeto; no app, o vault.
 function alvo(projeto) {
@@ -191,7 +191,9 @@ async function tratar(msg, ctx) {
         protocolVersion: params.protocolVersion || '2025-06-18',
         capabilities: { tools: {} },
         serverInfo: { name: 'rubi', version: VERSAO },
-        instructions: 'Rubi: mapa e grafo de conhecimento do projeto. Antes de explorar, rubi_contexto (com termos relacionados). Ao aprender algo durável, rubi_registrar. Conversa longa: rubi_salvar_handoff.',
+        instructions: MODO_APP
+          ? 'Rubi é a memória do usuário, um grafo de conhecimento por projeto guardado em markdown. Quando ele mencionar o Rubi, pedir pra lembrar, guardar, retomar ou continuar de onde parou, use rubi_registrar, rubi_contexto e rubi_ultimo_handoff. Quando a conversa ficar longa, ofereça salvar um handoff com rubi_salvar_handoff.'
+          : 'Rubi: mapa e grafo de conhecimento do projeto. Antes de explorar, rubi_contexto (com termos relacionados). Ao aprender algo durável, rubi_registrar. Conversa longa: rubi_salvar_handoff.',
       });
     case 'ping':
       return ok({});

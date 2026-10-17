@@ -1,6 +1,6 @@
 {
   "name": "rubi",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Keeps Claude sessions short without losing the thread: early compaction with automatic handoffs, a markdown memory vault (Obsidian), a read guard and a token X-ray.",
   "author": {
     "name": "Yuri Bedran",
