@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "rubi",
   "display_name": "Rubi",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Persistent markdown memory for Claude Desktop: save where you left off and continue in a fresh chat without losing the thread.",
   "long_description": "Keeps notes and handoffs in a markdown vault (opens in Obsidian). When a chat gets long, Claude saves a handoff and you continue in a new chat, spending far less of your usage limit.",
   "author": {
@@ -27,28 +27,36 @@
   },
   "tools": [
     {
-      "name": "rubi_buscar",
-      "description": "Busca nas notas e handoffs"
+      "name": "rubi_contexto",
+      "description": "Search knowledge (text + graph) within a token budget"
+    },
+    {
+      "name": "rubi_registrar",
+      "description": "Store decisions, concepts, preferences as graph nodes"
+    },
+    {
+      "name": "rubi_mapa",
+      "description": "Overview of everything stored for a project"
+    },
+    {
+      "name": "rubi_escrever_resumo",
+      "description": "Write the curated project summary"
     },
     {
       "name": "rubi_ler",
-      "description": "Lê uma nota do vault"
-    },
-    {
-      "name": "rubi_salvar_nota",
-      "description": "Salva conhecimento durável"
+      "description": "Open a stored item"
     },
     {
       "name": "rubi_salvar_handoff",
-      "description": "Salva o 'onde paramos'"
+      "description": "Save where you left off"
     },
     {
       "name": "rubi_ultimo_handoff",
-      "description": "Devolve o último handoff"
+      "description": "Fetch the latest handoff"
     },
     {
       "name": "rubi_projetos",
-      "description": "Lista os projetos do vault"
+      "description": "List stored projects"
     }
   ],
   "user_config": {

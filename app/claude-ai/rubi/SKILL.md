@@ -40,6 +40,6 @@ Se o usuário disser "continua de onde parei" (com ou sem projeto):
 
 ## 4. Lembrar coisas duráveis
 
-Se o usuário disser "lembra disso", ou surgir algo que vale pra outras conversas (preferência, decisão, dado fixo), salve com `rubi_salvar_nota` (com conector). Antes de pedir pra ele repetir algo que talvez já tenha contado, procure com `rubi_buscar`.
+Se o usuário disser "lembra disso", ou surgir algo que vale pra outras conversas, guarde com `rubi_registrar` (com conector). Use o tipo certo: `preferencia`, `decisao` (com o porquê), `conceito`, `como-fazer`. Ligue os fatos entre si com `liga`. Se algo mudou, use `substitui` e o antigo fica marcado. Antes de pedir pra ele repetir algo que talvez já tenha contado, procure com `rubi_contexto`, mandando também `termos` relacionados.
 
 Nunca salve senhas, documentos pessoais ou dados de cartão.

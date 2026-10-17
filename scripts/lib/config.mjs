@@ -13,6 +13,10 @@ const PADRAO = {
   janela: 150000, // tokens em que a sessão deve compactar
   avisoPct: 0.8, // a partir de quanto da janela o medidor pede o handoff
   guarda: { ativa: true, maxLinhas: 800, maxBytes: 80000 },
+  colheita: true, // no fim de uma resposta que explorou o código, pede pra registrar o que aprendeu
+  colheitaMin: 10, // quantas leituras/buscas sem registro disparam a colheita (benchmark: abaixo disso não compensa)
+  lembranca: true, // a cada pedido, injeta o conhecimento relevante do grafo
+  lembrancaOrcamento: 700, // tokens no máximo
 };
 
 export function lerConfig() {
@@ -45,15 +49,19 @@ export function salvarEstado(sessao, estado) {
   fs.writeFileSync(path.join(DIR_ESTADO, `${sessao}.json`), JSON.stringify(estado));
 }
 
-// Nome do projeto: pasta raiz do git, senão a pasta atual. A home vira "_geral".
-export function nomeProjeto(dir = process.env.CLAUDE_PROJECT_DIR || process.cwd()) {
-  let d = path.resolve(dir);
-  if (d === path.resolve(os.homedir())) return '_geral';
+// Raiz do projeto: a pasta raiz do git, senão a pasta atual. Na home não há projeto (null).
+export function raizProjeto(dir = process.env.CLAUDE_PROJECT_DIR || process.cwd()) {
+  const d = path.resolve(dir);
+  if (d === path.resolve(os.homedir())) return null;
   for (let atual = d; ; ) {
-    if (fs.existsSync(path.join(atual, '.git'))) { d = atual; break; }
+    if (fs.existsSync(path.join(atual, '.git'))) return atual;
     const pai = path.dirname(atual);
-    if (pai === atual) break;
+    if (pai === atual) return d;
     atual = pai;
   }
-  return path.basename(d).replace(/[\\/:*?"<>|#^[\]]/g, '-').trim() || '_geral';
+}
+
+export function nomeProjeto(dir) {
+  const r = raizProjeto(dir);
+  return r ? path.basename(r).replace(/[\\/:*?"<>|#^[\]]/g, '-').trim() || '_geral' : '_geral';
 }

@@ -187,6 +187,88 @@ def terminal():
 </svg>"""
 
 
-for name, fn in [("hero.svg", hero), ("how-it-works.svg", how), ("terminal.svg", terminal)]:
+# ---------------------------------------------------------------- knowledge graph
+def graph():
+    W, H, T = 1200, 540, 11
+    COR = {"conceito": RUBY2, "armadilha": WARN, "decisao": OK, "velha": GRAY, "arquivo": "#7aa2f7", "modulo": "#bb9af7", "handoff": MUTED}
+    nos = {
+        "checkout": (330, 190, "conceito", "Checkout"),
+        "cupom": (560, 120, "armadilha", "Cupom aplicado 2x"),
+        "jwt": (150, 390, "decisao", "Usar JWT"),
+        "sessao": (90, 485, "velha", "Sessão em cookie"),
+        "ctsx": (170, 250, "arquivo", "Checkout.tsx"),
+        "cupomts": (590, 280, "arquivo", "cupom.ts"),
+        "api": (420, 380, "arquivo", "api.ts"),
+        "login": (300, 470, "arquivo", "login.ts"),
+        "mod": (690, 410, "modulo", "src/desconto"),
+        "ho": (520, 480, "handoff", "handoff 17/10"),
+    }
+    arestas = [("checkout", "ctsx", "usa"), ("checkout", "cupom", "sobre"), ("cupom", "cupomts", ""), ("ctsx", "cupomts", "import"),
+               ("cupomts", "api", "import"), ("ctsx", "api", ""), ("login", "api", ""), ("jwt", "login", ""), ("jwt", "sessao", "substitui"),
+               ("cupomts", "mod", ""), ("ho", "cupomts", "")]
+    # quando cada nó acende (segundos) — 0: semente pelo texto; depois a vizinhança
+    acende = {"checkout": 1.2, "cupom": 2.6, "ctsx": 2.6, "cupomts": 4.0, "api": 5.2}
+    pct = lambda s: f"{s / T * 100:.2f}%"
+
+    def no_svg(k):
+        x, y, tipo, rot = nos[k]
+        c = COR[tipo]
+        forma = (f'<rect x="{x-11}" y="{y-11}" width="22" height="22" rx="5" fill="{c}" fill-opacity=".18" stroke="{c}" stroke-width="2"/>' if tipo in ("arquivo", "modulo")
+                 else f'<circle cx="{x}" cy="{y}" r="13" fill="{c}" fill-opacity=".18" stroke="{c}" stroke-width="2"{" stroke-dasharray=\"3 3\"" if tipo == "velha" else ""}/>')
+        glow = ""
+        if k in acende:
+            a = acende[k]
+            forte = "1" if k != "api" else ".45"
+            glow = (f'<style>@keyframes g{k}{{0%,{pct(a-0.01)}{{opacity:0}}{pct(a)},88%{{opacity:{forte}}}92%,100%{{opacity:0}}}}</style>'
+                    f'<circle cx="{x}" cy="{y}" r="24" fill="none" stroke="{RUBY2}" stroke-width="3" opacity="0" style="animation:g{k} {T}s linear infinite"/>')
+        tx = f'<text x="{x}" y="{y+32}" text-anchor="middle" font-family="{SANS}" font-size="13" fill="{TEXT if tipo != "velha" else GRAY}"{" text-decoration=\"line-through\"" if tipo == "velha" else ""}>{rot}</text>'
+        base = (f'<rect x="{x-11}" y="{y-11}" width="22" height="22" rx="5" fill="{BG}"/>' if tipo in ("arquivo", "modulo")
+                else f'<circle cx="{x}" cy="{y}" r="13" fill="{BG}"/>')
+        return glow + base + forma + tx
+
+    def aresta_svg(a, b, rel):
+        x1, y1 = nos[a][:2]; x2, y2 = nos[b][:2]
+        ativa = a in acende and b in acende
+        anim = ""
+        if ativa:
+            t = max(acende[a], acende[b]) - 0.4
+            anim = (f'<style>@keyframes e{a}{b}{{0%,{pct(t-0.01)}{{stroke:{LINE};stroke-width:1.5}}{pct(t)},88%{{stroke:{RUBY};stroke-width:3}}92%,100%{{stroke:{LINE};stroke-width:1.5}}}}</style>')
+        lbl = f'<text x="{(x1+x2)/2}" y="{(y1+y2)/2-6}" text-anchor="middle" font-family="{MONO}" font-size="11" fill="{GRAY}">{rel}</text>' if rel else ""
+        return anim + f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{LINE}" stroke-width="1.5"{f" style=\"animation:e{a}{b} {T}s linear infinite\"" if ativa else ""}/>' + lbl
+
+    linhas = [
+        (0.4, RUBY2, "rubi_contexto("),
+        (0.4, TEXT, '  "problema ao finalizar compra",'),
+        (0.4, MUTED, '  termos: ["checkout", "carrinho"])'),
+        (6.0, WARN, "[armadilha] Cupom aplicado 2x"),
+        (6.0, GRAY, '  ligado a "Checkout" · cupom.ts'),
+        (6.6, RUBY2, "[conceito] Checkout"),
+        (6.6, GRAY, "  texto"),
+        (7.2, "#7aa2f7", "[arquivo] src/desconto/cupom.ts"),
+        (7.2, GRAY, '  ligado a "Cupom aplicado 2x"'),
+        (7.8, "#7aa2f7", "[arquivo] src/checkout/Checkout.tsx"),
+        (8.4, OK, "✓ 4 itens · ~380 tokens"),
+    ]
+    painel = []
+    for i, (a, c, t) in enumerate(linhas):
+        painel.append(f'<style>@keyframes p{i}{{0%,{pct(a-0.01)}{{opacity:0}}{pct(a)},90%{{opacity:1}}93%,100%{{opacity:0}}}}</style>'
+                      f'<text x="800" y="{150 + i * 27 + (20 if i >= 3 else 0)}" font-family="{MONO}" font-size="14" fill="{c}" opacity="0" style="animation:p{i} {T}s linear infinite" xml:space="preserve">{t}</text>')
+    legenda = [("conceito", "concept"), ("armadilha", "gotcha"), ("decisao", "decision"), ("arquivo", "file"), ("modulo", "module")]
+    leg = "".join(f'<circle cx="{40 + i*120}" cy="40" r="6" fill="{COR[k]}"/><text x="{52 + i*120}" y="45" font-family="{SANS}" font-size="13" fill="{MUTED}">{t}</text>' for i, (k, t) in enumerate(legenda))
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img" aria-label="Rubi knowledge graph: a query lights up a concept by text and spreads to its neighbors">
+<defs><clipPath id="r"><rect width="{W}" height="{H}" rx="24"/></clipPath></defs>
+<g clip-path="url(#r)">
+<rect width="{W}" height="{H}" fill="{BG}"/>
+{leg}
+<text x="40" y="78" font-family="{SANS}" font-size="13" fill="{GRAY}">.rubi/ — one markdown file per node · links = edges · opens as an Obsidian graph</text>
+{''.join(aresta_svg(*e) for e in arestas)}
+{''.join(no_svg(k) for k in nos)}
+<rect x="770" y="105" width="400" height="400" rx="16" fill="{PANEL}" stroke="{LINE}"/>
+{''.join(painel)}
+</g>
+</svg>"""
+
+
+for name, fn in [("hero.svg", hero), ("how-it-works.svg", how), ("terminal.svg", terminal), ("graph.svg", graph)]:
     (OUT / name).write_text(fn(), encoding="utf-8")
     print("wrote", name)

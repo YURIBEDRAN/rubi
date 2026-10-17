@@ -1,26 +1,50 @@
 #!/usr/bin/env node
-// Todos os hooks do plugin num arquivo só. Uso: node hook.mjs <inicio|medidor|pre-compactar|guarda>
+// Todos os hooks do plugin num arquivo só. Uso: node hook.mjs <inicio|lembrar|medidor|pre-compactar|colher|guarda>
 // Recebe o JSON do Claude Code no stdin. Nunca pode quebrar a sessão: qualquer erro sai em silêncio.
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { lerConfig, lerEstado, salvarEstado, nomeProjeto } from './lib/config.mjs';
-import { ultimoHandoff, titulosNotas, salvarSessao, raizVault } from './lib/vault.mjs';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { lerConfig, lerEstado, salvarEstado, raizProjeto, nomeProjeto } from './lib/config.mjs';
+import { memoriaDoProjeto, ultimoHandoff, salvarSessao } from './lib/memoria.mjs';
+import { lerIndice, lerMapa, atualizarIndice } from './lib/mapa.mjs';
+import { buscarContexto } from './lib/busca.mjs';
+import { memoriaPessoal } from './lib/memoria.mjs';
+import { normalizarArquivo } from './lib/grafo.mjs';
 import { contextoAtual, registroSessao, registroEmMarkdown } from './lib/transcript.mjs';
 
+const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const fmt = (n) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
 const HORA = 36e5;
+const F = (n) => `mcp__plugin_rubi_rubi__${n}`;
+const GUIA = `Antes de explorar o código, consulte a memória: ${F('rubi_contexto')} (mande termos relacionados). Aprendeu algo durável (como algo funciona, decisão e porquê, bug, armadilha): ${F('rubi_registrar')}. Pergunta ampla sobre o código: agente rubi-pesquisador.`;
 
 function responder(evento, extra) {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: evento, ...extra } }));
 }
 
+// Atualiza o índice do código sem travar o início da sessão.
+function indexarEmSegundoPlano(raiz) {
+  try {
+    spawn(process.execPath, [path.join(AQUI, 'indexar.mjs'), raiz], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+  } catch {}
+}
+
 // SessionStart: devolve a memória certa pra cada jeito de começar.
 function inicio(e) {
-  const projeto = nomeProjeto(e.cwd);
+  const raiz = raizProjeto(e.cwd);
+  const m = memoriaDoProjeto(e.cwd);
   const estado = lerEstado(e.session_id);
-  const h = ultimoHandoff(projeto);
   const partes = [];
+
+  if (raiz) {
+    // primeira vez no projeto: indexa já (é rápido); depois, só em segundo plano
+    if (!lerIndice(m)) atualizarIndice(m, raiz, { projeto: nomeProjeto(e.cwd) });
+    else indexarEmSegundoPlano(raiz);
+  }
+  const h = ultimoHandoff(m);
+  const mapa = lerMapa(m);
 
   if (e.source === 'compact') {
     // A compactação nativa acabou de resumir a conversa. Devolvemos o que o resumo genérico perde.
@@ -28,31 +52,18 @@ function inicio(e) {
       partes.push(`[rubi] A conversa foi compactada. Este é o handoff que você salvou antes (${h.caminho}). Continue a partir dele:\n\n${h.texto}`);
     }
     if (estado.ultimoRegistro) {
-      partes.push(`Registro automático do trecho compactado (pedidos, arquivos e comandos): ${estado.ultimoRegistro} — leia com rubi_ler se faltar algum detalhe.`);
+      partes.push(`Registro automático do trecho compactado (pedidos, arquivos e comandos): ${estado.ultimoRegistro}. Abra com rubi_ler se faltar algum detalhe.`);
     }
     salvarEstado(e.session_id, { ...estado, avisado: false, proximoAviso: 0 });
   } else if (e.source === 'clear') {
-    if (h && Date.now() - h.mtime < 48 * HORA) {
-      partes.push(`[rubi] Nova janela. Último handoff do projeto "${projeto}" (${h.caminho}):\n\n${h.texto}`);
-    }
-  } else {
-    // startup/resume: só um ponteiro curto, pra não pesar no contexto fixo.
-    const notas = titulosNotas(projeto);
-    if (notas.length || h) {
-      let t = `[rubi] Projeto "${projeto}" tem memória no vault.`;
-      if (notas.length) t += ` Notas: ${notas.slice(0, 30).join(' · ')}${notas.length > 30 ? ` (+${notas.length - 30})` : ''}.`;
-      if (h) {
-        const objetivo = h.texto.split('\n').find((l) => l.trim() && !l.startsWith('#'))?.trim().slice(0, 200);
-        t += ` Último handoff ${new Date(h.mtime).toLocaleString('pt-BR')}: "${objetivo}". Se o usuário quiser continuar de onde parou, use rubi_ultimo_handoff.`;
-      }
-      t += ' Antes de reexplorar o código, procure com rubi_buscar.';
-      partes.push(t);
-    }
+    if (h && Date.now() - h.mtime < 48 * HORA) partes.push(`[rubi] Nova janela. Último handoff (${h.caminho}):\n\n${h.texto}`);
   }
+  if (mapa && e.source !== 'compact') partes.push(`[rubi] Mapa do projeto (nível 0; zoom com rubi_mapa):\n\n${mapa.trim()}`);
+  if (partes.length || raiz) partes.push(`[rubi] ${GUIA}`);
   if (partes.length) responder('SessionStart', { additionalContext: partes.join('\n\n') });
 }
 
-// UserPromptSubmit e PostToolUse: mede o contexto e pede o handoff antes da compactação.
+// Mede o contexto e pede handoff + registro antes da compactação.
 function medidor(e) {
   if (!e.transcript_path) return;
   const cfg = lerConfig();
@@ -70,25 +81,83 @@ function medidor(e) {
 
   let msg = `[rubi] Contexto em ${fmt(ctx)} de ${fmt(cfg.janela)} tokens.`;
   if (!estado.avisado) {
-    msg += ' Salve AGORA um handoff com a skill "handoff" (ferramenta rubi_salvar_handoff): objetivo, estado atual, decisões, arquivos-chave e próximo passo. Faça isso sem parar pra perguntar ao usuário e depois siga o trabalho normalmente.';
+    msg += ' Antes da compactação, sem parar pra perguntar ao usuário:'
+      + ' (1) rubi_registrar com os fatos duráveis desta sessão (decisões e o porquê, bugs e correções, armadilhas, conceitos), ligando aos arquivos;'
+      + ' (2) se entendeu um módulo que está sem resumo, rubi_escrever_resumo;'
+      + ' (3) rubi_salvar_handoff (skill "handoff"): objetivo, estado atual, arquivos-chave e próximo passo.'
+      + ' Depois siga o trabalho normalmente.';
   }
   if (!cfg.compactaSozinho) {
-    msg += ` A compactação automática cedo não está ligada: depois do handoff, sugira ao usuário rodar /compact (ou /clear — o handoff volta sozinho na janela nova).`;
+    msg += ' A compactação automática cedo não está ligada: depois do handoff, sugira ao usuário rodar /compact (ou /clear; o handoff volta sozinho na janela nova).';
   } else {
     msg += ' A conversa vai ser compactada automaticamente logo e o handoff volta pra você em seguida.';
   }
   salvarEstado(e.session_id, { ...estado, avisado: true, proximoAviso: ctx + cfg.janela * 0.5 });
-  responder(e.hook_event_name, { additionalContext: msg });
+  return msg;
 }
 
-// PreCompact: salva no vault o registro objetivo do trecho que vai sumir.
+function medidorHook(e) {
+  const msg = medidor(e);
+  if (msg) responder(e.hook_event_name, { additionalContext: msg });
+}
+
+// UserPromptSubmit: lembrança automática. Busca no grafo pelo que o usuário acabou de pedir e
+// entrega o conhecimento relevante antes de o Claude começar a explorar. Sem turno extra.
+function lembrar(e) {
+  const partes = [];
+  const cfg = lerConfig();
+  const raiz = raizProjeto(e.cwd);
+  const prompt = String(e.prompt || '');
+  if (cfg.lembranca !== false && raiz && prompt.trim().length >= 12 && !prompt.trim().startsWith('/')) {
+    const m = memoriaDoProjeto(e.cwd);
+    const codigo = lerIndice(m)?.codigo || { arquivos: {}, modulos: {} };
+    const achado = buscarContexto({ m, mp: memoriaPessoal(), raiz, codigo, pergunta: prompt.slice(0, 2000), orcamento: cfg.lembrancaOrcamento || 700, limite: 6, soConhecimento: true });
+    if (achado) partes.push(`[rubi] Da memória do projeto, relevante pra este pedido. Use como ponto de partida: vá direto aos arquivos citados em vez de explorar o projeto, e só confira no código o que for alterar:\n\n${achado}`);
+  }
+  const msg = medidor(e);
+  if (msg) partes.push(msg);
+  if (partes.length) responder('UserPromptSubmit', { additionalContext: partes.join('\n\n') });
+}
+
+// PreCompact: salva o registro objetivo do trecho que vai sumir, ligado aos arquivos mexidos.
 function preCompactar(e) {
   if (!e.transcript_path) return;
-  const projeto = nomeProjeto(e.cwd);
+  const raiz = raizProjeto(e.cwd);
   const r = registroSessao(e.transcript_path);
-  const caminho = salvarSessao(projeto, registroEmMarkdown(r), e.session_id);
+  const arquivos = r.arquivos.map(([f]) => normalizarArquivo(raiz, f)).filter((f) => !f.startsWith('..') && !path.isAbsolute(f)).slice(0, 60);
+  const caminho = salvarSessao(memoriaDoProjeto(e.cwd), registroEmMarkdown(r), e.session_id, arquivos);
   const estado = lerEstado(e.session_id);
   salvarEstado(e.session_id, { ...estado, ultimoRegistro: caminho });
+}
+
+// Stop: se o Claude explorou o código e não guardou nada, pede pra registrar antes de encerrar.
+// É a hora mais barata pra extrair conhecimento: o que ele descobriu ainda está no contexto.
+const EXPLORA = new Set(['Read', 'Grep', 'Glob']);
+function colher(e) {
+  const cfg = lerConfig();
+  if (!cfg.colheita || e.stop_hook_active || !e.transcript_path || !raizProjeto(e.cwd)) return;
+  const estado = lerEstado(e.session_id);
+  let explora = 0, registra = 0, fd;
+  try {
+    // lê só o que chegou desde a última vez
+    fd = fs.openSync(e.transcript_path, 'r');
+    const tam = fs.fstatSync(fd).size;
+    const ini = Math.min(estado.colheitaOffset || 0, tam);
+    const buf = Buffer.alloc(tam - ini);
+    fs.readSync(fd, buf, 0, buf.length, ini);
+    for (const m of buf.toString('utf8').matchAll(/"type":"tool_use","id":"[^"]*","name":"([^"]+)"/g)) {
+      if (EXPLORA.has(m[1])) explora++;
+      if (/rubi_registrar|rubi_salvar_handoff/.test(m[1])) registra++;
+    }
+    estado.colheitaOffset = tam;
+  } catch { return; } finally { if (fd !== undefined) fs.closeSync(fd); }
+  const pendente = registra ? 0 : (estado.exploradoSemRegistro || 0) + explora;
+  if (pendente < cfg.colheitaMin) { salvarEstado(e.session_id, { ...estado, exploradoSemRegistro: pendente }); return; }
+  salvarEstado(e.session_id, { ...estado, exploradoSemRegistro: 0 });
+  process.stdout.write(JSON.stringify({
+    decision: 'block',
+    reason: `[rubi] Antes de encerrar: você explorou o código (${pendente} leituras/buscas) e nada foi guardado. Registre com ${F('rubi_registrar')} de 1 a 5 fatos duráveis que descobriu (como algo funciona, onde fica, armadilhas, decisões), ligados aos arquivos, pra próxima sessão não precisar reler. Seja breve. Se não houver nada que valha guardar, só encerre sem comentar.`,
+  }));
 }
 
 // PreToolUse (Read e Bash): barra leitura de arquivo gigante inteiro. Na segunda tentativa passa.
@@ -139,13 +208,12 @@ function guarda(e) {
   });
 }
 
-const ACOES = { inicio, medidor, 'pre-compactar': preCompactar, guarda };
+const ACOES = { inicio, medidor: medidorHook, lembrar, 'pre-compactar': preCompactar, guarda, colher };
 
 try {
   const entrada = fs.readFileSync(0, 'utf8');
   const e = entrada.trim() ? JSON.parse(entrada) : {};
   e.session_id ||= 'sem-sessao';
-  fs.mkdirSync(raizVault(), { recursive: true });
   ACOES[process.argv[2]]?.(e);
 } catch (err) {
   if (process.env.RUBI_DEBUG) console.error(err);

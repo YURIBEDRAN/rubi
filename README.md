@@ -2,12 +2,14 @@
   <img src="docs/assets/hero.svg" alt="Rubi: only what's precious stays in context" width="100%">
 </p>
 
+<h3 align="center">A knowledge graph and context manager for Claude.<br>Shorter sessions, organized projects, fewer tokens.</h3>
+
 <p align="center">
   <a href="https://yuribedran.github.io/rubi/"><b>Live demo</b></a> ·
-  <a href="#install">Install</a> ·
-  <a href="#how-it-works">How it works</a> ·
-  <a href="#token-x-ray">Token X-ray</a> ·
-  <a href="#faq">FAQ</a>
+  <a href="#5-walkthrough-a-week-with-rubi">Walkthrough</a> ·
+  <a href="#4-results">Results</a> ·
+  <a href="#7-install">Install</a> ·
+  <a href="#2-background-the-ideas-in-plain-words">The theory</a>
 </p>
 
 <p align="center">
@@ -15,332 +17,516 @@
   <img alt="Claude Desktop" src="https://img.shields.io/badge/Claude%20Desktop-extension-e0245e?style=flat-square">
   <img alt="claude.ai" src="https://img.shields.io/badge/claude.ai-skill-e0245e?style=flat-square">
   <img alt="Zero dependencies" src="https://img.shields.io/badge/dependencies-0-3ccf91?style=flat-square">
-  <img alt="Node 18+" src="https://img.shields.io/badge/node-%E2%89%A518-8b93a7?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-12%20passing-3ccf91?style=flat-square">
   <img alt="MIT" src="https://img.shields.io/badge/license-MIT-8b93a7?style=flat-square">
 </p>
 
-**Rubi keeps your Claude sessions short on its own, without losing the thread.** It compacts early, saves a handoff before every compaction and restores it right after. It keeps what matters in a markdown vault you can open in Obsidian, and it shows you exactly where your tokens go.
+---
 
-No server. No database. No dependencies beyond Node.
+## Abstract
+
+AI coding assistants are billed for every token they read, and in a long conversation they re-read the whole history on every message. Analyzing **284 real Claude Code sessions**, we found that **71% of the cost was spent re-reading context** and **97% came from sessions that grew past 150k tokens**. Claude was not doing more work. It was carrying more weight.
+
+**Rubi** attacks the problem from two sides:
+
+1. **Keep sessions short without losing the thread.** It compacts early, saves a *handoff* before each compaction and restores it right after.
+2. **Make the project easy to find your way around, so less reading is needed.** It builds a **map of the code** (imports and centrality via PageRank) and a **temporal knowledge graph** of decisions, bugs, gotchas and concepts. The graph is written by Claude itself, at the moment it already holds that knowledge in context, and searched with a hybrid of BM25, Personalized PageRank and Reciprocal Rank Fusion, within a token budget. Relevant knowledge is **recalled automatically** on every request, before Claude starts exploring.
+
+Everything is plain markdown inside the project (`.rubi/`), opens as an Obsidian graph, and runs locally with zero dependencies.
+
+**Results.** Two studies, reported as measured, including what did not work:
+
+| Study | Result |
+|---|---|
+| Early compaction, replayed on 284 real sessions | **≈37% lower total cost** (simulation on real context curves) |
+| A/B benchmark, 90 sessions, reading a mature graph | **−37% steps, −37% context re-read, −17% time**; billed cost **−6%** in short cold-start sessions |
+| Same, projected onto the real cost mix (71% cache reads) | **≈26% lower cost** (projection, not yet measured) |
+| A/B benchmark, writing memory after every answer | **+15% cost** in short sessions, so the default was changed to write less often |
 
 ---
 
-## Why
+## Contents
 
-Every message you send re-sends the **whole conversation**. Prompt caching makes that re-read cheaper, but it still happens on every turn. So cost grows with session length: message #500 pays for the 499 before it.
+1. [The problem: why long sessions get expensive](#1-the-problem-why-long-sessions-get-expensive)
+2. [Background: the ideas, in plain words](#2-background-the-ideas-in-plain-words)
+3. [Design: how Rubi works](#3-design-how-rubi-works)
+4. [Results](#4-results)
+5. [Walkthrough: a week with Rubi](#5-walkthrough-a-week-with-rubi)
+6. [Limitations and threats to validity](#6-limitations-and-threats-to-validity)
+7. [Install](#7-install)
+8. [Reference](#8-reference)
+9. [References](#9-references)
 
-We ran Rubi's X-ray on 30 days of real Claude Code usage (284 sessions):
+---
 
-| What the X-ray found | |
+## 1. The problem: why long sessions get expensive
+
+### 1.1 Claude has no memory between messages
+
+A language model does not "remember" a conversation. Every time you send a message, the **entire conversation so far** is sent again: your requests, Claude's answers, and every file it read and every command it ran. That bundle is the **context**.
+
+> **In plain words.** Imagine a consultant who, before answering each new question, re-reads the whole meeting transcript from the start. Message 10 is cheap. Message 500 means re-reading 499 pages first.
+
+So the cost of a session is not proportional to the number of messages but to the **sum of the context sizes**. If the context grows by a roughly constant amount per message, that sum grows with the **square** of the session length.
+
+### 1.2 Caching helps, but doesn't fix it
+
+Anthropic's **prompt caching** stores the beginning of the context so that re-reading it costs about **10%** of the normal input price. It is a real discount, and in our data it worked: **99% cache hit rate**. But 10% of a million tokens, on every message, for hundreds of messages, is still most of the bill. When the cache expires (for example after a pause), the whole context is written to it again at a higher price.
+
+### 1.3 What the data showed
+
+Rubi ships a **token X-ray** that reads Claude Code's local transcripts. On 30 days of real usage:
+
+| Finding (284 sessions, 30 days) | |
 |---|---|
-| Share of cost that was just **re-reading context** (cache reads) | **71%** |
+| Share of cost that was **re-reading context** (cache reads) | **71%** |
 | Share of cost from sessions that grew past **150k tokens** | **97%** |
-| Sessions that crept up to **~1 million** tokens | **68** |
+| Sessions that reached **~1 million** tokens | **68** |
 | Context loaded **before the first message** (median) | **48k** |
-| Cache hit rate | 99% (the cache was fine; the sessions were just too long) |
+| Tool whose outputs weighed most in the context | Bash (15%), then Read (4%) |
+| Times the cache expired mid-session and was rewritten | 197 |
 
-Simulating the same month with Rubi (compact at 150k, handoff preserved) cut **about one third of the total**. A single long session saves much more, about **two thirds**:
+Two conclusions drove the design:
+
+- **Sessions are too long.** Claude Code only compacts near the model's limit, and with a 1M-token model that is very late.
+- **Claude spends a lot of effort finding its way around.** A large share of the context is file reads and searches that rediscover how the project works, every new session.
+
+---
+
+## 2. Background: the ideas, in plain words
+
+Rubi combines well-known techniques from information retrieval, graph theory and recent research on memory for language models. Each one below gets a plain-words explanation and a pointer to the original work.
+
+### 2.1 What a knowledge graph does that notes don't
 
 <p align="center">
-  <a href="https://yuribedran.github.io/rubi/"><img src="docs/assets/demo.gif" alt="Interactive demo: the same session with and without Rubi" width="100%"></a>
-  <br><sub><a href="https://yuribedran.github.io/rubi/">Open the interactive demo</a> and drag the sliders to match how you work.</sub>
+  <img src="docs/assets/graph.svg" alt="A query lights up the concept Checkout by text, then spreads to the linked gotcha, files and imports" width="100%">
 </p>
+
+A **graph** is just *things* (nodes) connected by *relationships* (edges). In Rubi the nodes are files, modules, decisions, bugs, gotchas and concepts, and the edges are "file A imports file B", "this decision is about login.ts", "this bug is related to Checkout", "this decision replaces that one".
+
+> **In plain words.** A folder of notes is like a pile of index cards: you only find a card if you guess the word written on it. A graph is like a **city map**: from where you are, you can see what's next door. Ask about *"finishing a purchase"* and a plain search finds nothing, because no note says "purchase". With Rubi, Claude adds the related word *checkout* to the search (section 2.9), the graph finds the concept **Checkout**, sees that it is **linked** to a gotcha called *"Coupon applied twice"* and to the file `cupom.ts`, and brings those along. You get the trap you were about to fall into, even though you never typed its name.
+
+That is the difference: **search finds what matches your words; a graph also finds what is connected to them.** In code, connections are everything: who imports whom, which decision affects which file, which bug came back where.
+
+### 2.2 Ranking by text: BM25
+
+When you search, something has to decide which results come first. **BM25** (Robertson & Zaragoza, 2009) is the classic answer used by search engines: a word counts more if it is **rare** in the collection and **frequent** in the document, with diminishing returns so repetition doesn't win. Rubi uses it for the textual part of the search, with accent folding, camelCase splitting (`PaymentError` → `payment`, `error`) and light Portuguese/English stemming.
+
+### 2.3 Who matters most: PageRank
+
+**PageRank** (Brin & Page, 1998), the algorithm behind early Google, says a page is important if important pages link to it. Applied to code: a file is **central** if many files import it, especially central ones. Rubi computes PageRank over the import graph to tell Claude, in one line, which files are the backbone of the project. This is the same idea as Aider's *repo map*.
+
+### 2.4 Spreading from what matched: Personalized PageRank
+
+**Personalized PageRank** (Haveliwala, 2002) is PageRank that "starts" from a few chosen nodes and spreads outward, so you get what is important **relative to your question**. **HippoRAG** (Gutiérrez et al., 2024) showed this works remarkably well as long-term memory for language models, inspired by how the hippocampus links memories. Rubi seeds it with the nodes that matched your words and lets relevance flow through the graph, discounting "hub" files that everything touches.
+
+### 2.5 Combining rankings: Reciprocal Rank Fusion
+
+Text, exact file and function names, and graph proximity each produce their own ranked list. **Reciprocal Rank Fusion** (Cormack et al., 2009) merges them with a simple rule: each list gives every item `1 / (60 + position)`, and the scores are added. It is robust, needs no tuning, and is what ai-memory also uses.
+
+### 2.6 Zoom levels: hierarchical summaries
+
+Microsoft's **GraphRAG** (Edge et al., 2024) showed the value of summarizing a knowledge graph at several levels. Rubi keeps three:
+
+| Level | File | Size | When it's read |
+|---|---|---|---|
+| 0 | `mapa.md` | ~500 tokens | at the start of every session |
+| 1 | `modulos/<module>.md` | a page per module | on demand, with `rubi_mapa(module)` |
+| 2 | `conhecimento/*.md` | one file per node | found by search |
+
+> **In plain words.** Instead of handing someone the whole encyclopedia, you hand them the table of contents and let them open the chapter they need.
+
+### 2.7 Facts that change: a temporal graph
+
+Decisions change. **Zep / Graphiti** (Rasmussen et al., 2025) proposed a *temporal* knowledge graph for agent memory, where facts are invalidated instead of deleted. Rubi does the same: when a new decision `replaces` an old one, the old node is marked **superseded** and points to its successor. Claude never follows a stale rule, yet it can still see why things changed. Each node also records the files and the git commit it came from. If a file changed after the note was written, search flags it with **⚠** so Claude double-checks.
+
+### 2.8 Memory tiers
+
+**MemGPT** (Packer et al., 2023) framed LLM memory like an operating system: a small core always in context, a working set, and archival storage. Rubi maps that onto **core** (the level-0 map), **working** (the current handoff) and **archival** (the graph, queried on demand).
+
+### 2.9 The key idea: Claude is the indexer and the semantic search
+
+Most memory systems call **another** model to extract facts and compute embeddings. Rubi doesn't need one, because **Claude is already running**:
+
+- **Extraction happens when knowledge is already paid for.** At handoff time, or at the end of an answer that required exploring the code, Claude has everything in context. Writing down 3 facts costs a few hundred output tokens. Asking another model later would mean re-reading everything.
+- **Semantic search is done by Claude, not by vectors.** When Claude queries Rubi it sends `termos`: synonyms, related concepts and likely function names it imagines. That is the *query expansion* idea behind HyDE (Gao et al., 2022) and Query2doc (Wang et al., 2023). The LLM supplies the meaning; BM25 and the graph supply the speed.
+- **Heavy research runs in a separate window.** The bundled `rubi-pesquisador` subagent explores in its own context and returns only the conclusion, so the main session stays light.
+
+| Work | Who does it | Token cost |
+|---|---|---|
+| Map the code (files, imports, symbols, PageRank) | Rubi, deterministic | none |
+| Link notes to files and git history | Rubi, deterministic | none |
+| Extract decisions, bugs, gotchas, concepts | Claude, at handoff or at the end of an exploration | a few hundred output tokens |
+| Recall what matters for each new request | Rubi hook (BM25 + graph over your prompt) | none to compute; ≤700 tokens injected, only when something matches |
+| Understand the question (synonyms, related terms) | Claude, when calling the search | dozens of tokens |
+| Deep exploration of the code | `rubi-pesquisador` subagent | isolated from the main context |
 
 ---
 
-## How it works
+## 3. Design: how Rubi works
+
+### 3.1 What lives in your project
+
+```text
+your-project/
+├── .rubi/                         ← commit it: your team shares the memory
+│   ├── mapa.md                    level 0 · injected at the start of every session
+│   ├── modulos/src-checkout.md    level 1 · one per module
+│   ├── conhecimento/              level 2 · one markdown file per graph node
+│   │   ├── decisao-usar-jwt-em-vez-de-sessao.md
+│   │   ├── armadilha-cupom-aplicado-duas-vezes.md
+│   │   └── conceito-checkout.md
+│   ├── handoffs/2026-10-17-1530.md
+│   ├── sessoes/…                  automatic pre-compaction records (git-ignored)
+│   └── .indice.json               derived index, rebuildable (git-ignored)
+└── CLAUDE.md                      can now be short: it points to the map
+```
+
+A node is ordinary markdown with its type and edges in the frontmatter:
+
+```markdown
+---
+id: "decisao-usar-jwt-em-vez-de-sessao"
+tipo: "decisao"
+status: "ativo"
+arquivos: ["src/auth/login.ts"]
+liga: [{"rel":"sobre","alvo":"conceito-autenticacao"}]
+substitui: "decisao-sessao-em-cookie"
+commit: "a1b2c3d"
+---
+
+# Usar JWT em vez de sessão
+
+Stateless, so it runs on edge runtimes without a session store.
+
+## Ligações
+- sobre [[conceito-autenticacao]]
+- substitui [[decisao-sessao-em-cookie]]
+```
+
+Personal preferences that apply to every project live in a separate personal vault (`~/rubi-vault/_pessoal`). Search covers both.
+
+### 3.2 The life cycle
 
 <p align="center">
   <img src="docs/assets/how-it-works.svg" alt="Context grows, meter saves a handoff at 80%, Claude Code compacts at 150k, Rubi records the session, then restores the handoff" width="100%">
 </p>
 
-1. **Compact early.** Claude Code compacts on its own at **150k** instead of near **1M**. You never type `/clear`.
-2. **Meter.** At 80% of the window, a hook tells Claude to write a **handoff**: goal, current state, decisions, key files, next step.
-3. **Record.** Right before compaction, Rubi saves what's about to disappear (your requests, files changed, commands run) to the vault. No LLM involved, just extraction.
-4. **Restore.** Right after compaction, the handoff is injected back. Claude carries on from **~60k** tokens instead of 500k+, with the details the generic summary would have lost.
-
 ```mermaid
 sequenceDiagram
     participant You
     participant Claude as Claude Code
-    participant Rubi as Rubi hooks
-    participant Vault as Markdown vault
-    You->>Claude: keep working
-    Claude->>Rubi: every tool call / message
-    Rubi-->>Claude: "context at 120k of 150k, save a handoff"
-    Claude->>Vault: rubi_salvar_handoff
-    Note over Claude: hits 150k, auto-compacts
-    Claude->>Rubi: PreCompact
-    Rubi->>Vault: session record (requests, files, commands)
-    Claude->>Rubi: SessionStart (compact)
-    Vault-->>Rubi: latest handoff
-    Rubi-->>Claude: handoff + record path
+    participant Rubi as Rubi hooks + MCP
+    participant Mem as .rubi/ (markdown graph)
+    Note over Rubi,Mem: session start: index the code (incremental), inject the ~500-token map
+    You->>Claude: "fix the coupon bug in checkout"
+    Rubi-->>Claude: recall: gotcha "Coupon applied twice" (from the graph, before any exploration)
+    Claude->>Rubi: rubi_contexto("coupon bug", termos: [discount, cart, Checkout])
+    Rubi->>Mem: BM25 + entities + Personalized PageRank → RRF
+    Rubi-->>Claude: gotcha "Coupon applied twice", cupom.ts, Checkout.tsx (≤1.5k tokens)
+    Claude->>Claude: goes straight to the right file
+    Note over Claude,Rubi: end of an answer that explored the code
+    Rubi-->>Claude: Stop hook: "register what you learned"
+    Claude->>Mem: rubi_registrar(facts, links, files)
+    Note over Claude,Rubi: context reaches 80% of 150k
+    Rubi-->>Claude: "save a handoff now"
+    Claude->>Mem: rubi_salvar_handoff
+    Claude->>Rubi: PreCompact → session record saved
+    Claude->>Rubi: SessionStart(compact) → handoff injected back
     Claude->>You: continues, same thread, ~60k context
 ```
 
-### Inside your terminal
+| Hook / tool | What it does |
+|---|---|
+| `SessionStart` | Indexes the code (incremental, in the background after the first run) and injects the level-0 map. After a compaction or `/clear`, injects the handoff. |
+| `UserPromptSubmit` | **Recall.** Searches the graph with your request and injects the relevant knowledge (≤700 tokens, only when something actually matches). Also runs the meter. |
+| `PostToolUse` | **Meter.** Reads the real context size and, at 80% of the window, asks Claude to register facts, write missing summaries and save a handoff. |
+| `Stop` | **Harvest.** If the answer involved heavy exploration (≥10 reads/searches) and nothing was saved, asks Claude to register 1–5 durable facts before finishing. |
+| `PreCompact` | Saves an objective record of what is about to be compacted (requests, files changed, commands) and links it to the files. |
+| `PreToolUse` | **Read guard.** Blocks reading a huge file in full once and points to Grep or `offset/limit`. |
+| `rubi_contexto` | Hybrid search within a token budget. |
+| `rubi_registrar` | Writes graph nodes: merges duplicates, resolves links, supersedes old decisions. |
+| `rubi_mapa`, `rubi_escrever_resumo` | Zoom levels and curated summaries. |
 
-<p align="center">
-  <img src="docs/assets/terminal.svg" alt="Terminal demo: installing Rubi, the read guard, the meter, the handoff and the restore" width="100%">
-  <br><sub>Illustrative session.</sub>
-</p>
+### 3.3 What a search returns
+
+```text
+[armadilha] Cupom aplicado duas vezes — conhecimento/armadilha-cupom-aplicado-duas-vezes.md
+  `src/desconto/cupom.ts` · ⚠ src/desconto/cupom.ts mudou depois desta nota
+  O desconto rodava antes do total ser recalculado.
+
+[conceito] Checkout — conhecimento/conceito-checkout.md
+  Fluxo de finalizar compra.
+
+[arquivo] src/desconto/cupom.ts — módulo src/desconto, usado por 2 · ligado a "Cupom aplicado duas vezes"
+  aplicarCupom
+
+(3 itens, ~180 tokens. Abra um item com rubi_ler; zoom no módulo com rubi_mapa.)
+```
+
+Every item says **why** it is there ("ligado a…" = linked to, "citado" = named in the question), so Claude can trust or discard it quickly.
 
 ---
 
-## Install
+## 4. Results
 
-You need **Node 18+**.
+We ran two studies: a retrospective analysis of real usage, and a controlled A/B benchmark.
 
-### Claude Code (terminal, VS Code, JetBrains)
+### 4.1 Study 1: early compaction on real sessions
 
-**1. Add and install the plugin** inside Claude Code:
+**Method.** The X-ray reads every Claude Code transcript from the last 30 days (284 sessions) and replays each session's actual context curve under a policy that compacts whenever the context passes a threshold and resumes from the fixed context plus an 8k-token handoff. The cost of each compaction (rewriting the new cache prefix) is charged. Costs are in input-token equivalents using Anthropic's price ratios (cache read 0.1×, cache write 1.25–2×, output 5×).
+
+| Compaction threshold | Window switches | Estimated saving on total cost |
+|---|---|---|
+| 100k | 1,827 | ~29% |
+| **150k** | **695** | **~37%** |
+| 250k | 336 | ~31% |
+
+150k was the sweet spot: lower thresholds pay for too many compactions, higher ones carry too much context. This is why Rubi's default is 150k. The [interactive demo](https://yuribedran.github.io/rubi/) lets you replay a single session with your own numbers.
+
+### 4.2 Study 2: controlled A/B benchmark with the knowledge graph
+
+**Method.** Two public repositories were cloned fresh for every run: [Flask](https://github.com/pallets/flask) (Python) and [Hono](https://github.com/honojs/hono) (TypeScript). For each one we wrote **three chained questions** about the same area of the code, like three days of work on one feature (see [`bench/tarefas.json`](bench/tarefas.json)). Each question ran in a **new session**, so nothing carried over except what was stored on disk.
+
+We separated the two things a memory system does, **reading** and **writing**, into four arms:
+
+| Arm | What runs | Question it answers |
+|---|---|---|
+| **A** | Claude Code, no plugin | baseline |
+| **B** | Rubi complete, harvesting after every answer that explored ≥4 files | what does *writing* the memory cost? |
+| **C** | Rubi, map + automatic recall, no harvest, empty graph | what does *reading* cost or save with no knowledge yet? |
+| **D** | Same as C, but starting with a graph of 5–6 nodes written by Claude in arm B | what does a *mature* project memory save? |
+
+- Model `claude-sonnet-5`, read-only tools, **3 repetitions per arm**, fresh clone per repetition, **90 sessions** in total (round 1: A vs B; round 2: A vs C vs D, re-running A so both rounds have their own baseline).
+- Metrics: the cost Claude Code itself reports (`total_cost_usd`), turns (API calls), tokens by type, and wall-clock time.
+- A pilot round was **discarded**: a quoting bug in the benchmark script meant the plugin never loaded in arm B. The script now refuses to record a Rubi arm if the plugin did not run.
+
+Reproduce with `node bench/rodar.mjs --reps 3 --bracos A,C,D`. Raw CSVs, summaries and every answer are in [`bench/resultados/`](bench/resultados/). The seed graph for arm D is in [`bench/sementes/`](bench/sementes/).
+
+#### Reading the memory (round 2)
+
+| | **A** no Rubi | **C** map + recall | **D** mature graph |
+|---|---|---|---|
+| Turns (3 sessions, mean) | 34.0 | 26.7 **(−21%)** | 21.3 **(−37%)** |
+| Cache reads (tokens) | 919k | 771k (−16%) | 579k **(−37%)** |
+| Output tokens | 8.5k | 6.8k (−20%) | 6.3k (−26%) |
+| Cache writes (tokens) | 131k | 141k (+7%) | 141k (+8%) |
+| Wall-clock time | 161 s | 146 s (−9%) | 133 s **(−17%)** |
+| **Billed cost** | $0.793 | $0.785 **(−1%)** | $0.744 **(−6%)** |
+
+| Billed cost by slice | A | C | D |
+|---|---|---|---|
+| Flask | $0.444 | $0.422 (−5%) | $0.383 (−14%) |
+| Hono | $0.349 | $0.362 (+4%) | $0.361 (+3%) |
+| Session 1 | $0.310 | $0.278 (−10%) | $0.278 (−11%) |
+| Session 2 | $0.205 | $0.255 (+24%) | $0.237 (+16%) |
+| Session 3 | $0.278 | $0.252 (−9%) | $0.229 (−18%) |
+
+#### Writing the memory (round 1)
+
+| | **A** no Rubi | **B** harvest after every exploring answer |
+|---|---|---|
+| Billed cost (3 sessions, mean) | $0.800 | $0.922 **(+15%)** |
+| Turns | 33.0 | 32.3 |
+| Nodes in the graph at the end | — | 2 to 5 |
+
+### 4.3 Discussion
+
+**Reading a project memory makes Claude much more direct.** With a mature graph, Claude needed **37% fewer steps**, re-read **37% less context** and finished **17% faster**. It went straight to the files the memory pointed at instead of searching around. Even with an empty graph, the map and the recall alone cut 21% of the steps.
+
+**In this benchmark that only became a 6% lower bill, and here is why.** Every question ran in a brand-new, cold session: a single question, then the session ends. In that setting the most expensive part is writing the cache from scratch (cache writes cost 2× the input price), and that part is the same with or without Rubi. The savings land on cache reads and output, which are a small share of a 3-to-5-turn session.
+
+**Real work looks the other way around.** In the 284 real sessions of Study 1, cache **reads were 71% of the cost**, writes ~20% and output ~10%. Applying arm D's measured changes to that real mix (reads −37%, writes +8%, output −26%) gives:
+
+```text
+0.71 × 0.63  +  0.20 × 1.08  +  0.10 × 0.74  =  0.737   →  ≈ 26% lower cost
+```
+
+That is a **projection**, not a measurement. Measuring it properly needs long, multi-task sessions on a real project; that is the next benchmark.
+
+**Answer quality.** A spot check found the answers equivalent, with one telling difference. On the Flask teardown question, the baseline answer cited `RequestContext.pop`, a class that no longer exists in current Flask (it was merged into `AppContext`), most likely recalled from training data. The answer with a mature graph got it right, because the graph held the fact *"AppContext and RequestContext were unified"*, written by Claude after reading the actual code. A memory of **this** codebase beats the model's memory of **old versions** of it. That is one observation, not a measured rate.
+
+**Writing on every answer does not pay in short sessions.** Arm B's harvest (an extra tool load plus an extra call that re-reads the context) cost 15% more, and three short sessions are not enough to earn it back. Following this result, **Rubi's default changed**: the harvest now only triggers after heavy exploration (≥10 reads/searches with nothing saved), and the main extraction happens at the meter (80% of the window), when the context is already large and paid for.
+
+**Where the money is today.** Of everything measured, the largest lever is still **keeping sessions short** (Study 1: about 37% of total cost, simulated on real usage). The knowledge graph's measured contribution is **fewer steps and less re-reading**, which compounds in long sessions and on codebases the model has never seen. Flask and Hono are famous projects the model partly knows from training, the least favorable case for a memory.
+
+---
+
+## 5. Walkthrough: a week with Rubi
+
+**Monday, install (2 minutes).**
 
 ```text
 /plugin marketplace add YURIBEDRAN/rubi
 /plugin install rubi@rubi
 ```
 
-**2. Turn on early compaction** and choose where the vault lives:
+Then `node scripts/instalar.mjs` from a clone of this repo turns on early compaction (150k) and creates your personal vault. Details in [Install](#7-install).
+
+**Monday, first session.** You open Claude Code in your project. Rubi indexes the code in under a second for most projects and injects the map:
+
+```text
+[rubi] Mapa do projeto (nível 0)
+## Módulos
+- src/checkout (8) — centrais: Checkout.tsx, useCart.ts, api.ts
+- src/desconto (4) — centrais: cupom.ts, regras.ts
+## Arquivos centrais
+`src/lib/api.ts` · `src/types.ts` · `src/checkout/Checkout.tsx` …
+```
+
+Claude already knows where things live before you ask anything.
+
+**Monday, you ask:** *"why is the coupon applied twice?"* Claude calls `rubi_contexto` with related terms (`discount`, `cart`, `aplicarCupom`), goes straight to `cupom.ts`, finds the bug and fixes it. When it finishes, the **harvest** hook asks it to save what it learned:
+
+```text
+rubi_registrar → criado: conhecimento/bug-cupom-aplicado-duas-vezes.md
+                 criado: conhecimento/conceito-checkout.md
+```
+
+**Tuesday, new session, related task:** *"add a second coupon type."* Before Claude reads anything, Rubi's **recall** hook searches the graph with your request and injects the bug note, the concept *Checkout* and the files involved. Claude doesn't rediscover the checkout flow. It reads two files instead of ten.
+
+**Wednesday, a long refactor.** The context grows. At 120k the meter tells Claude to register the decisions it made and save a handoff. At 150k Claude Code compacts on its own. Rubi saves a record of the session and, right after compaction, injects the handoff back. You keep talking; Claude keeps going from ~60k instead of dragging 500k along.
+
+**Thursday, a decision changes.** *"Let's use JWT instead of session cookies."* Claude registers the new decision with `substitui: "Sessão em cookie"`. The old one is marked superseded, never deleted, and no future session will follow it.
+
+**Friday, look at it.** Open `.rubi/` in Obsidian and switch to graph view: modules, decisions, bugs and concepts, connected. Run `/rubi:raio-x` to see where the week's tokens went, and `/rubi:organizar` if your `CLAUDE.md` has grown fat. It moves the details into the graph and leaves only the rules that matter in every message.
+
+---
+
+## 6. Limitations and threats to validity
+
+- **Small benchmark.** Two repositories, three chained tasks, 3 repetitions per arm (90 sessions). LLM runs vary between executions (standard deviation up to $0.05 per 3-session run on Flask); treat the numbers as indicative. The benchmark is in the repo so it can be rerun and extended.
+- **Cold, short sessions.** Each benchmark question is a one-shot session, which favors cache writes over cache reads and hides most of the reading savings. The 26% figure for real usage is a projection.
+- **The seed graph for arm D came from arm B's own runs** on the same questions, so it is relevant by construction. A real project memory is built from many different tasks, so it is broader and noisier.
+- **Famous repositories.** Flask and Hono are well known, so the model already knows parts of them from training, which favors the baseline. Private, less-known codebases should benefit more from a map and a graph. We have not measured that yet.
+- **The graph is only as good as what is registered.** Claude decides what to store. The harvest hook and the meter make it happen at the right moments, but extraction quality depends on the model.
+- **Overhead on tiny tasks.** The map (~500 tokens) and the tool definitions are a fixed cost. On a one-shot question that needs no exploration, Rubi can cost slightly more than nothing.
+- **Code map is regex-based**, not a full parser (no tree-sitter, to keep zero dependencies). Imports are resolved for JS/TS (relative and `@/` aliases), Python, Go, Rust, Java/Kotlin, PHP, Ruby, C/C++, CSS and Dart. Dynamic imports and exotic aliases may be missed.
+- **No vector embeddings.** Meaning comes from Claude's own query expansion. For very large knowledge bases (tens of thousands of nodes), an embedding index could be added later; the JSON index can also be swapped for SQLite FTS5.
+- **Hooks cannot run `/clear` or `/compact`**, nor edit Claude Code's compaction summary. Rubi works around it: Claude Code compacts at the threshold you set, and Rubi handles what happens before and after.
+- **The web and mobile apps have no hooks.** There, the skill makes Claude estimate when a chat is long, instead of measuring it.
+
+---
+
+## 7. Install
+
+You need **Node 18+**.
+
+### Claude Code (terminal, VS Code, JetBrains)
+
+```text
+/plugin marketplace add YURIBEDRAN/rubi
+/plugin install rubi@rubi
+```
+
+Turn on early compaction and choose your personal vault:
 
 ```bash
 git clone https://github.com/YURIBEDRAN/rubi && cd rubi
 node scripts/instalar.mjs
 ```
 
-The installer asks for a vault folder (default `~/rubi-vault`) and a compaction threshold (default `150000`, minimum `100000`). It writes `CLAUDE_CODE_AUTO_COMPACT_WINDOW` into the `env` block of `~/.claude/settings.json` and backs up the original to `settings.json.bak-rubi`.
-
-- **Undo:** `node scripts/instalar.mjs --desfazer`
-- **Try without installing:** `claude --plugin-dir path/to/rubi`
-- **Skip step 2:** Rubi still works, but Claude Code only compacts near the model's limit. The meter warns at 120k and suggests `/compact`.
+The installer writes `CLAUDE_CODE_AUTO_COMPACT_WINDOW` (default `150000`) into `~/.claude/settings.json`, with a backup in `settings.json.bak-rubi`. Undo with `node scripts/instalar.mjs --desfazer`. To try Rubi without installing: `claude --plugin-dir path/to/rubi`.
 
 ### Claude Desktop
 
-1. Download **`rubi.mcpb`** from [Releases](https://github.com/YURIBEDRAN/rubi/releases/latest).
-2. Open it with Claude Desktop (or drag it into **Settings → Extensions**) and pick a vault folder. An existing Obsidian vault works.
-3. Also upload the **`rubi.zip`** skill (next section). It teaches Claude when a chat has grown too long.
+Download **`rubi.mcpb`** from [Releases](https://github.com/YURIBEDRAN/rubi/releases/latest), open it with Claude Desktop and pick a vault folder. An existing Obsidian vault works. Also upload the `rubi.zip` skill below.
 
 ### claude.ai and mobile
 
-The web and mobile apps have no hooks, so the automatic part becomes behavior: the skill teaches Claude to notice a long chat, offer a handoff and continue in a fresh one.
-
-**Skill only (zero setup)**
-
-1. Download **`rubi.zip`** from [Releases](https://github.com/YURIBEDRAN/rubi/releases/latest).
-2. On claude.ai go to **Settings → Capabilities → Skills → Upload skill**. Skills must be enabled on your plan.
-3. When a chat gets long, Claude hands you a short summary block to paste into a new chat.
-
-**Skill + connector (memory saved for real, on your phone too)**
-
-Run the same MCP server in HTTP mode on a server you control:
-
-```bash
-export RUBI_TOKEN=$(openssl rand -hex 24)   # secret, goes in the URL
-export RUBI_VAULT=/srv/rubi-vault
-node scripts/mcp-server.mjs --http --porta 8787
-```
-
-It binds to `127.0.0.1` only. Put HTTPS in front, for example with Caddy:
-
-```text
-rubi.yourdomain.com {
-  reverse_proxy 127.0.0.1:8787
-}
-```
-
-Then on claude.ai: **Settings → Connectors → Add custom connector** with the URL `https://rubi.yourdomain.com/mcp/<RUBI_TOKEN>`. Connectors added on the web also show up in the mobile app.
+- **Skill only (zero setup):** upload **`rubi.zip`** in **Settings → Capabilities → Skills**. When a chat gets long, Claude offers a handoff you paste into a new chat.
+- **Skill + connector (memory saved for real, on your phone too):** run `RUBI_TOKEN=$(openssl rand -hex 24) node scripts/mcp-server.mjs --http` on a server you control, behind HTTPS, and add `https://your-domain/mcp/<RUBI_TOKEN>` in **Settings → Connectors → Add custom connector**.
 
 > [!WARNING]
-> Anyone with that URL can read and write your memory. Treat it like a password, keep secrets out of the vault and run the server as an unprivileged user.
+> Anyone with the connector URL can read and write that memory. Treat it as a password and keep secrets out of the vault.
 
 ---
 
-## What you get
-
-| Piece | What it does | Where |
-|---|---|---|
-| **Early compaction** | Claude Code compacts at 150k (configurable) instead of near 1M | `CLAUDE_CODE_AUTO_COMPACT_WINDOW` |
-| **Meter** | Reads the real context size on every message and tool call, asks for a handoff before compaction | `UserPromptSubmit`, `PostToolUse` hooks |
-| **Session record** | Saves requests, changed files, commands and the last reply right before compaction | `PreCompact` hook |
-| **Restore** | Injects the handoff after compaction or `/clear`. On a fresh start, only a short index | `SessionStart` hook |
-| **Read guard** | Blocks reading a huge file in full (Read or `cat`) once and points to Grep or `offset/limit`. Repeat the same call and it goes through | `PreToolUse` hook |
-| **Vault** | Plain markdown, one folder per project, `[[wiki-links]]` for Obsidian | MCP server `rubi` |
-| **Token X-ray** | Where your tokens went: cost breakdown, priciest sessions, heaviest tools, cache misses, savings simulation | `/rubi:raio-x` |
-| **Fixed-context audit** | What loads into every session (CLAUDE.md, memory, skills, MCP) and what to trim | `/rubi:raio-x` |
+## 8. Reference
 
 <details>
 <summary><b>MCP tools</b></summary>
 
 | Tool | Purpose |
 |---|---|
-| `rubi_buscar` | Search notes, handoffs and records (accent-insensitive, returns short snippets) |
-| `rubi_ler` | Open a vault file (cannot escape the vault folder) |
-| `rubi_salvar_nota` | Durable knowledge: decisions, maps, gotchas (`substituir` = replace, `anexar` = append) |
-| `rubi_salvar_handoff` | Save "where we left off" |
-| `rubi_ultimo_handoff` | Fetch the latest handoff for a project |
-| `rubi_projetos` | List projects in the vault |
-| `rubi_raio_x` / `rubi_auditar` | Token diagnostics (Claude Code only) |
+| `rubi_contexto` | Hybrid search (text + names + graph) within a token budget. Send `termos` with related words. |
+| `rubi_registrar` | Store facts as graph nodes: `decisao`, `bug`, `armadilha`, `conceito`, `como-fazer`, `preferencia`, `tarefa`, `nota`; with `arquivos`, `liga` and `substitui`. |
+| `rubi_mapa` | Level 0 (no args) or level 1 (`modulo`). |
+| `rubi_escrever_resumo` | Curated summary for `mapa` or `modulo:<name>`, preserved across re-indexing. |
+| `rubi_ler` | Open a memory item (`pessoal:` prefix for the personal vault). |
+| `rubi_salvar_handoff` / `rubi_ultimo_handoff` | Where we left off. |
+| `rubi_raio_x` / `rubi_auditar` | Token diagnostics (Claude Code only). |
+| `rubi_projetos` | List stored projects (app mode only). |
 
 </details>
 
 <details>
-<summary><b>Slash commands (skills)</b></summary>
+<summary><b>Skills, agent and commands</b></summary>
 
-- `/rubi:handoff`: save where you left off right now (the meter triggers it automatically).
-- `/rubi:memoria <topic>`: search the project memory. Also teaches Claude what is worth saving.
-- `/rubi:raio-x`: token diagnostics with the three changes that would save the most.
+- `/rubi:memoria <topic>`: search the project memory and learn what is worth storing.
+- `/rubi:handoff`: register facts and save a handoff now.
+- `/rubi:organizar`: slim down a large `CLAUDE.md` into the graph and the map.
+- `/rubi:raio-x`: where your tokens go, and what to change first.
+- Agent `rubi-pesquisador`: researches the codebase in its own context window and returns only the conclusion.
+- CLI: `node scripts/indexar.mjs`, `node scripts/raio-x.mjs --dias 30`, `node scripts/auditar.mjs <dir>`.
 
 </details>
 
----
-
-## The vault
-
-```text
-rubi-vault/
-├── LEIA-ME.md
-└── my-app/
-    ├── _indice.md                          links to everything (generated)
-    ├── notas/decisions.md                  durable knowledge, edit freely
-    ├── handoffs/2026-10-17-1530.md         "where we left off"
-    └── sessoes/2026-10-17-1531-8ab90355.md automatic pre-compaction record
-```
-
-The project name is the git root folder, or the current folder. Everything is markdown with frontmatter, so you can open it in Obsidian, `grep` it, edit it by hand or version it with git.
-
----
-
-## Token X-ray
-
-```bash
-node scripts/raio-x.mjs --dias 30          # where your tokens went
-node scripts/auditar.mjs <project-folder>  # what loads into every session
-```
-
-```text
-=== RAIO-X (30 dias, 284 sessões) ===
-Composição do custo:
-  write1h   109.7M tokens  -> 17% do custo
-  read     9212.2M tokens  -> 71% do custo
-  output     25.2M tokens  -> 10% do custo
-Pico de contexto por sessão: <50k 5 | 50-150k 128 | 150-400k 83 | >400k 68
-Sessões que passaram de 150k respondem por 97% do custo
-
-Simulação de handoff automático:
-  limite 150k: 695 trocas de janela, economia ~37% do custo total
-```
-
-Costs are shown in **input-token equivalents**: cache read 0.1×, cache write 1.25× (5 min) or 2× (1 h), output 5×. These are Anthropic's price ratios, so the numbers hold for any model or plan without guessing dollar amounts.
-
-A typical audit finding: an 18k-token `CLAUDE.md` re-read on every single message, or 50k tokens of tool definitions from MCP servers the project never uses.
-
----
-
-## Configuration
-
-`~/.rubi/config.json`
-
-```json
-{
-  "vault": "D:/Notes/rubi-vault",
-  "janela": 150000,
-  "avisoPct": 0.8,
-  "guarda": { "ativa": true, "maxLinhas": 800, "maxBytes": 80000 }
-}
-```
+<details>
+<summary><b>Configuration (<code>~/.rubi/config.json</code>)</b></summary>
 
 | Key | Default | Meaning |
 |---|---|---|
-| `vault` | `~/rubi-vault` | Vault folder (or `RUBI_VAULT`) |
-| `janela` | `150000` | Reference window. `CLAUDE_CODE_AUTO_COMPACT_WINDOW` wins when set |
-| `avisoPct` | `0.8` | Fraction of the window at which the meter asks for a handoff |
-| `guarda.maxLinhas` / `maxBytes` | `800` / `80000` | When reading a whole file gets blocked |
-| `guarda.ativa` | `true` | Turn the read guard off |
+| `vault` | `~/rubi-vault` | Personal vault (or `RUBI_VAULT`) |
+| `janela` | `150000` | Compaction threshold. `CLAUDE_CODE_AUTO_COMPACT_WINDOW` wins when set |
+| `avisoPct` | `0.8` | When the meter asks for a handoff |
+| `colheita` / `colheitaMin` | `true` / `10` | Harvest after N reads/searches with nothing registered |
+| `guarda.maxLinhas` / `maxBytes` | `800` / `80000` | When a full-file read is blocked |
 
-Per-session state (what was already warned or allowed) lives in `~/.rubi/estado/`.
-
----
-
-## FAQ
-
-<details>
-<summary><b>Does Rubi send my data anywhere?</b></summary>
-
-No. Hooks and the MCP server run locally and only read your Claude Code transcripts and write to your vault. The only network piece is the optional HTTP connector, which you host yourself.
 </details>
 
 <details>
-<summary><b>Can a hook run <code>/clear</code> or <code>/compact</code>?</b></summary>
-
-No, Claude Code doesn't allow that. Claude Code compacts by itself at the threshold you set. Rubi handles the before (handoff and record) and the after (restore).
-</details>
-
-<details>
-<summary><b>Does it change Claude's compaction summary?</b></summary>
-
-No, hooks can't edit it. That's why the handoff and the session record go to the vault and are injected right after compaction.
-</details>
-
-<details>
-<summary><b>Why 150k?</b></summary>
-
-It was the best point in the simulation over real usage. Compaction has its own cost (one call that reads the context to summarize it), so going much lower stops paying off. Claude Code's minimum is 100k.
-</details>
-
-<details>
-<summary><b>The read guard blocked a file I really need.</b></summary>
-
-Ask again. The guard blocks only the first full read of each big file per session, then lets the same call through.
-</details>
-
-<details>
-<summary><b>Why are some names in Portuguese?</b></summary>
-
-Rubi was born in Brazil. Tool names, folders and the messages Rubi sends to Claude are in Portuguese for now. Claude understands them either way. English names are on the roadmap.
-</details>
-
----
-
-## Roadmap
-
-- **Knowledge graph:** automatic `[[links]]` between notes, files and concepts, search that expands to neighbors, backlinks and a real Obsidian graph view.
-- English tool names and messages.
-- Signed `.mcpb` releases.
-
-## Development
+<summary><b>Development</b></summary>
 
 ```bash
-npm test             # 9 tests: meter, compaction, guard, search, MCP stdio + HTTP
-npm run empacotar    # builds dist/rubi.mcpb and dist/rubi.zip
-claude plugin validate .
-python docs/assets/build_svgs.py   # regenerates the README animations
+npm test                     # 12 tests: code map, graph, search, map, hooks, MCP stdio + HTTP
+node bench/rodar.mjs         # A/B benchmark
+npm run empacotar            # dist/rubi.mcpb + dist/rubi.zip
+python docs/assets/build_svgs.py
 ```
 
-```text
-.claude-plugin/   plugin.json + marketplace.json
-hooks/hooks.json  SessionStart, UserPromptSubmit, PostToolUse, PreCompact, PreToolUse
-skills/           handoff, memoria, raio-x
-scripts/
-  hook.mjs        every hook (inicio | medidor | pre-compactar | guarda)
-  mcp-server.mjs  MCP server (stdio + HTTP), zero dependencies
-  raio-x.mjs      token X-ray from transcripts
-  auditar.mjs     fixed-context audit
-  instalar.mjs    vault + early compaction setup
-  empacotar.mjs   builds the desktop and claude.ai packages
-  lib/            config, vault, transcript parsing
-app/
-  desktop/manifest.json   Claude Desktop extension (.mcpb)
-  claude-ai/rubi/         claude.ai skill
-docs/             interactive demo (GitHub Pages) and README assets
-```
+| File | Role |
+|---|---|
+| `scripts/lib/codigo.mjs` | Code map: imports, symbols, modules, PageRank |
+| `scripts/lib/grafo.mjs` | Temporal knowledge graph: register, merge, supersede |
+| `scripts/lib/busca.mjs` | BM25 + entities + Personalized PageRank, fused with RRF |
+| `scripts/lib/mapa.mjs` | Level 0/1 maps and the derived index |
+| `scripts/hook.mjs` | All hooks: start, recall, meter, harvest, pre-compact, guard |
+| `scripts/mcp-server.mjs` | MCP server (stdio and HTTP), zero dependencies |
 
-Hooks never break a session: any error exits silently. Set `RUBI_DEBUG=1` to see it. The meter reads only the last 0.5 MB of the transcript and runs in about 0.1 s, even with 100+ MB transcripts.
+</details>
 
-## Credits
+> **Why some names are in Portuguese.** Rubi was born in Brazil, and tool names, folders and the messages it sends to Claude are in Portuguese. Claude understands them either way. The name comes from **Rubi**nger, and from the idea of keeping only what's precious.
 
-- The name comes from **Rubi**nger, and from the idea of keeping only what's precious.
-- [akitaonrails/ai-memory](https://github.com/akitaonrails/ai-memory) for the idea of memory as a versionable markdown wiki fed by hooks.
-- Built with Claude Code.
+---
 
-## License
+## 9. References
 
-MIT
+1. Robertson, S., & Zaragoza, H. (2009). *The Probabilistic Relevance Framework: BM25 and Beyond.* Foundations and Trends in Information Retrieval.
+2. Brin, S., & Page, L. (1998). *The Anatomy of a Large-Scale Hypertextual Web Search Engine.* WWW7.
+3. Haveliwala, T. H. (2002). *Topic-Sensitive PageRank.* WWW 2002.
+4. Gutiérrez, B. J., Shu, Y., Gu, Y., Yasunaga, M., & Su, Y. (2024). *HippoRAG: Neurobiologically Inspired Long-Term Memory for Large Language Models.* NeurIPS 2024.
+5. Cormack, G. V., Clarke, C. L. A., & Büttcher, S. (2009). *Reciprocal Rank Fusion Outperforms Condorcet and Individual Rank Learning Methods.* SIGIR 2009.
+6. Edge, D., et al. (2024). *From Local to Global: A Graph RAG Approach to Query-Focused Summarization.* Microsoft Research.
+7. Rasmussen, P., et al. (2025). *Zep: A Temporal Knowledge Graph Architecture for Agent Memory.*
+8. Packer, C., et al. (2023). *MemGPT: Towards LLMs as Operating Systems.*
+9. Gao, L., Ma, X., Lin, J., & Callan, J. (2022). *Precise Zero-Shot Dense Retrieval without Relevance Labels* (HyDE).
+10. Wang, L., Yang, N., & Wei, F. (2023). *Query2doc: Query Expansion with Large Language Models.* EMNLP 2023.
+11. Aider. *Repository map* (code graph ranked with PageRank). aider.chat/docs/repomap.html
+12. Anthropic. *Prompt caching* and *Claude Code hooks* documentation.
+13. Akita, F. *ai-memory*: long-term memory for AI coding agents. github.com/akitaonrails/ai-memory
+
+---
+
+<p align="center"><sub>MIT · built with Claude Code · <a href="https://yuribedran.github.io/rubi/">yuribedran.github.io/rubi</a></sub></p>
