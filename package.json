@@ -1,6 +1,6 @@
 {
-  "name": "memoria-claude",
-  "version": "0.1.0",
+  "name": "rubi",
+  "version": "0.2.0",
   "description": "Gaste menos token sem perder o fio: compactação cedo com handoff automático, memória em markdown (Obsidian), guarda de leitura e raio-X de gasto.",
   "type": "module",
   "license": "MIT",

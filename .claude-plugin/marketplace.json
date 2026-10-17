@@ -1,18 +1,18 @@
 {
-  "name": "memoria-claude",
+  "name": "rubi",
   "owner": {
     "name": "Yuri Bedran",
     "url": "https://github.com/YURIBEDRAN"
   },
   "plugins": [
     {
-      "name": "memoria-claude",
+      "name": "rubi",
       "source": "./",
       "description": "Gaste menos token sem perder o fio: compactação cedo com handoff automático, memória em markdown (Obsidian), guarda de leitura e raio-X de gasto."
     }
   ],
   "metadata": {
     "description": "Plugins de economia de contexto e memória para o Claude Code",
-    "version": "0.1.0"
+    "version": "0.2.0"
   }
 }

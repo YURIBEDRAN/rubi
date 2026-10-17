@@ -5,8 +5,8 @@ description: Mostra pra onde o token está indo (raio-X dos transcripts do Claud
 
 # Raio-X de gasto
 
-1. Rode `memoria_raio_x` (padrão 30 dias; use `dias` se o usuário pedir outro período).
-2. Rode `memoria_auditar` pra ver o contexto fixo do projeto atual.
+1. Rode `rubi_raio_x` (padrão 30 dias; use `dias` se o usuário pedir outro período).
+2. Rode `rubi_auditar` pra ver o contexto fixo do projeto atual.
 3. Responda em linguagem simples:
    - De onde vem a maior parte do custo (normalmente leitura de cache em sessões longas).
    - As 3 ações com maior economia, em ordem, cada uma com o número que justifica.

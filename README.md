@@ -1,6 +1,8 @@
-# memoria-claude
+# 💎 Rubi
 
-**Gaste menos token sem perder o fio.** Um plugin pro Claude Code (e uma extensão + skill pro app e pro site) que mantém as conversas curtas sozinho, guarda o "onde paramos" num vault markdown que abre no Obsidian e mostra pra onde o seu token está indo.
+> **Só o que vale ouro fica no contexto.**
+
+**Gaste menos token sem perder o fio.** O Rubi é um plugin pro Claude Code (e uma extensão + skill pro app e pro site) que mantém as conversas curtas sozinho, guarda o "onde paramos" num vault markdown que abre no Obsidian e mostra pra onde o seu token está indo.
 
 Inspirado no [ai-memory do Akita](https://github.com/akitaonrails/ai-memory), com outro foco: em vez de levar memória entre agentes diferentes, aqui o objetivo é **cortar o custo de sessões longas** dentro do próprio Claude, sem servidor rodando e sem nenhuma dependência além do Node.
 
@@ -45,27 +47,27 @@ conversa crescendo...
 | **Registro automático** | Antes de cada compactação, salva o que vai sumir: pedidos, arquivos, comandos e a última resposta | hook `PreCompact` |
 | **Volta da memória** | Depois da compactação ou do `/clear`, injeta o handoff. Ao abrir uma sessão, mostra só um índice curto | hook `SessionStart` |
 | **Guarda de leitura** | Barra a leitura inteira de arquivo gigante (Read ou `cat`) e sugere Grep ou `offset/limit`. Se repetir a mesma chamada, ela passa | hook `PreToolUse` |
-| **Vault** | Markdown puro, uma pasta por projeto, com links `[[...]]` pro Obsidian | servidor MCP `memoria` |
-| **Raio-X** | Mostra pra onde o token foi: composição do custo, sessões mais caras, ferramentas que mais pesam, cache expirado, simulação | `/memoria-claude:raio-x` |
-| **Auditor** | Mostra o que entra fixo em toda sessão (CLAUDE.md, memória, skills, MCP) e sugere cortes | `/memoria-claude:raio-x` |
+| **Vault** | Markdown puro, uma pasta por projeto, com links `[[...]]` pro Obsidian | servidor MCP `rubi` |
+| **Raio-X** | Mostra pra onde o token foi: composição do custo, sessões mais caras, ferramentas que mais pesam, cache expirado, simulação | `/rubi:raio-x` |
+| **Auditor** | Mostra o que entra fixo em toda sessão (CLAUDE.md, memória, skills, MCP) e sugere cortes | `/rubi:raio-x` |
 
 ### Ferramentas MCP
 
 | Ferramenta | Pra quê |
 |---|---|
-| `memoria_buscar` | Busca nas notas, handoffs e registros (ignora acento, devolve só trechos) |
-| `memoria_ler` | Abre um arquivo do vault (não sai da pasta do vault) |
-| `memoria_salvar_nota` | Conhecimento durável: decisões, mapas, armadilhas (`substituir` ou `anexar`) |
-| `memoria_salvar_handoff` | O "onde paramos" |
-| `memoria_ultimo_handoff` | Pega o handoff mais recente do projeto |
-| `memoria_projetos` | Lista os projetos do vault |
-| `memoria_raio_x` / `memoria_auditar` | Diagnóstico de gasto (só no Claude Code) |
+| `rubi_buscar` | Busca nas notas, handoffs e registros (ignora acento, devolve só trechos) |
+| `rubi_ler` | Abre um arquivo do vault (não sai da pasta do vault) |
+| `rubi_salvar_nota` | Conhecimento durável: decisões, mapas, armadilhas (`substituir` ou `anexar`) |
+| `rubi_salvar_handoff` | O "onde paramos" |
+| `rubi_ultimo_handoff` | Pega o handoff mais recente do projeto |
+| `rubi_projetos` | Lista os projetos do vault |
+| `rubi_raio_x` / `rubi_auditar` | Diagnóstico de gasto (só no Claude Code) |
 
 ### Skills
 
-- `/memoria-claude:handoff`: salva o "onde paramos" agora (o medidor chama sozinho).
-- `/memoria-claude:memoria <assunto>`: busca na memória do projeto, e ensina o Claude a salvar o que vale guardar.
-- `/memoria-claude:raio-x`: diagnóstico de gasto com as 3 ações que mais economizam.
+- `/rubi:handoff`: salva o "onde paramos" agora (o medidor chama sozinho).
+- `/rubi:memoria <assunto>`: busca na memória do projeto, e ensina o Claude a salvar o que vale guardar.
+- `/rubi:raio-x`: diagnóstico de gasto com as 3 ações que mais economizam.
 
 ---
 
@@ -78,36 +80,36 @@ Precisa de **Node 18+**.
 Dentro do Claude Code:
 
 ```
-/plugin marketplace add YURIBEDRAN/memoria-claude
-/plugin install memoria-claude@memoria-claude
+/plugin marketplace add YURIBEDRAN/rubi
+/plugin install rubi@rubi
 ```
 
 Depois, ligue a compactação cedo e escolha a pasta do vault:
 
 ```bash
-git clone https://github.com/YURIBEDRAN/memoria-claude
-cd memoria-claude
+git clone https://github.com/YURIBEDRAN/rubi
+cd rubi
 node scripts/instalar.mjs
 ```
 
-O instalador pergunta a pasta do vault (padrão `~/memoria-claude-vault`) e em quantos tokens compactar (padrão 150000, mínimo 100000). Ele grava `CLAUDE_CODE_AUTO_COMPACT_WINDOW` no `env` do `~/.claude/settings.json` e faz backup em `settings.json.bak-memoria`. Pra voltar ao comportamento padrão: `node scripts/instalar.mjs --desfazer`.
+O instalador pergunta a pasta do vault (padrão `~/rubi-vault`) e em quantos tokens compactar (padrão 150000, mínimo 100000). Ele grava `CLAUDE_CODE_AUTO_COMPACT_WINDOW` no `env` do `~/.claude/settings.json` e faz backup em `settings.json.bak-rubi`. Pra voltar ao comportamento padrão: `node scripts/instalar.mjs --desfazer`.
 
 Sem rodar o instalador, o plugin funciona do mesmo jeito, mas o Claude Code só compacta perto do limite do modelo. Nesse caso o medidor avisa em 120k e sugere `/compact`.
 
-> Pra testar sem instalar: `claude --plugin-dir caminho/para/memoria-claude`.
+> Pra testar sem instalar: `claude --plugin-dir caminho/para/rubi`.
 
 ### App de desktop (Claude Desktop)
 
-1. Baixe `memoria-claude.mcpb` em [Releases](https://github.com/YURIBEDRAN/memoria-claude/releases), ou gere com `npm run empacotar`.
+1. Baixe `rubi.mcpb` em [Releases](https://github.com/YURIBEDRAN/rubi/releases), ou gere com `npm run empacotar`.
 2. Abra o arquivo com o Claude Desktop (ou arraste pra **Configurações → Extensões**) e escolha a pasta do vault.
-3. Suba também a skill `memoria-continua.zip` (próxima seção). É ela que ensina o Claude a perceber quando a conversa ficou longa.
+3. Suba também a skill `rubi.zip` (próxima seção). É ela que ensina o Claude a perceber quando a conversa ficou longa.
 
 ### Site e celular (claude.ai)
 
 No app e no site não existem hooks, então a parte automática vira comportamento: a skill ensina o Claude a perceber que a conversa ficou longa, oferecer o handoff e continuar numa conversa nova.
 
 **Só a skill (sem servidor nenhum):**
-1. Baixe `memoria-continua.zip` em Releases (ou gere com `npm run empacotar`).
+1. Baixe `rubi.zip` em Releases (ou gere com `npm run empacotar`).
 2. No claude.ai: **Configurações → Capacidades → Skills → Enviar skill**. A opção de skills precisa estar ativada no seu plano.
 3. Quando a conversa ficar longa, o Claude entrega o handoff num bloco pra você colar numa conversa nova.
 
@@ -115,20 +117,20 @@ No app e no site não existem hooks, então a parte automática vira comportamen
 O mesmo servidor MCP roda em modo HTTP numa VPS sua:
 
 ```bash
-export MEMORIA_TOKEN=$(openssl rand -hex 24)   # segredo, vai na URL
-export MEMORIA_VAULT=/srv/memoria-vault
+export RUBI_TOKEN=$(openssl rand -hex 24)   # segredo, vai na URL
+export RUBI_VAULT=/srv/rubi-vault
 node scripts/mcp-server.mjs --http --porta 8787
 ```
 
 Ele escuta só em `127.0.0.1`. Coloque um proxy com HTTPS na frente, por exemplo Caddy:
 
 ```
-memoria.seudominio.com {
+rubi.seudominio.com {
   reverse_proxy 127.0.0.1:8787
 }
 ```
 
-No claude.ai: **Configurações → Conectores → Adicionar conector personalizado**, com a URL `https://memoria.seudominio.com/mcp/<MEMORIA_TOKEN>`. O conector configurado no site também aparece no app de celular.
+No claude.ai: **Configurações → Conectores → Adicionar conector personalizado**, com a URL `https://rubi.seudominio.com/mcp/<RUBI_TOKEN>`. O conector configurado no site também aparece no app de celular.
 
 > **Segurança:** quem tiver essa URL lê e escreve na sua memória. Trate a URL como senha, não guarde segredos no vault e rode o servidor como um usuário sem privilégios. Se quiser o vault igual em todas as máquinas, versione a pasta com git.
 
@@ -136,11 +138,11 @@ No claude.ai: **Configurações → Conectores → Adicionar conector personaliz
 
 ## Configuração
 
-`~/.memoria-claude/config.json`:
+`~/.rubi/config.json`:
 
 ```json
 {
-  "vault": "D:/Notas/memoria-claude-vault",
+  "vault": "D:/Notas/rubi-vault",
   "janela": 150000,
   "avisoPct": 0.8,
   "guarda": { "ativa": true, "maxLinhas": 800, "maxBytes": 80000 }
@@ -149,18 +151,18 @@ No claude.ai: **Configurações → Conectores → Adicionar conector personaliz
 
 | Chave | Padrão | Efeito |
 |---|---|---|
-| `vault` | `~/memoria-claude-vault` | Pasta do vault (também `MEMORIA_VAULT`) |
+| `vault` | `~/rubi-vault` | Pasta do vault (também `RUBI_VAULT`) |
 | `janela` | `150000` | Tamanho de referência da sessão. `CLAUDE_CODE_AUTO_COMPACT_WINDOW` tem prioridade |
 | `avisoPct` | `0.8` | Em que fração da janela o medidor pede o handoff |
 | `guarda.maxLinhas` / `maxBytes` | `800` / `80000` | A partir de onde a leitura inteira de um arquivo é barrada |
 | `guarda.ativa` | `true` | Desliga a guarda |
 
-O estado por sessão (o que já foi avisado ou liberado) fica em `~/.memoria-claude/estado/`.
+O estado por sessão (o que já foi avisado ou liberado) fica em `~/.rubi/estado/`.
 
 ## O vault
 
 ```
-memoria-claude-vault/
+rubi-vault/
   LEIA-ME.md
   meu-projeto/
     _indice.md                        links pra tudo (gerado)
@@ -198,7 +200,7 @@ Exemplo do que o auditor costuma achar: um `CLAUDE.md` de 18k tokens relido em t
 
 ```bash
 npm test             # 9 testes: medidor, compactação, guarda, busca, MCP stdio e HTTP
-npm run empacotar    # gera dist/memoria-claude.mcpb e dist/memoria-continua.zip
+npm run empacotar    # gera dist/rubi.mcpb e dist/rubi.zip
 claude plugin validate .
 ```
 
@@ -216,13 +218,14 @@ scripts/
   lib/            config, vault e leitura de transcript
 app/
   desktop/manifest.json        extensão do Claude Desktop (.mcpb)
-  claude-ai/memoria-continua/  skill pro claude.ai
+  claude-ai/rubi/  skill pro claude.ai
 ```
 
-Os hooks nunca quebram a sessão: qualquer erro sai em silêncio. Pra ver o erro, defina `MEMORIA_DEBUG=1`. O medidor lê só o último 0,5 MB do transcript e roda em ~0,1 s, mesmo com transcripts de 100+ MB.
+Os hooks nunca quebram a sessão: qualquer erro sai em silêncio. Pra ver o erro, defina `RUBI_DEBUG=1`. O medidor lê só o último 0,5 MB do transcript e roda em ~0,1 s, mesmo com transcripts de 100+ MB.
 
 ## Créditos
 
+- O nome vem de **Rubi**nger, e da ideia de guardar só o que é precioso.
 - [akitaonrails/ai-memory](https://github.com/akitaonrails/ai-memory): a ideia de memória como wiki markdown versionável, com captura por hooks.
 - Feito com o Claude Code.
 

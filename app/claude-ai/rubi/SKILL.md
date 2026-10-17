@@ -1,9 +1,9 @@
 ---
-name: memoria-continua
+name: rubi
 description: Evita conversas gigantes que queimam o limite de uso. Quando a conversa fica longa, salva o "onde paramos" e leva o usuário pra uma conversa nova sem perder o fio. Use também quando o usuário disser "continua de onde parei", "lembra disso" ou citar um projeto salvo.
 ---
 
-# Memória contínua
+# Rubi: memória contínua
 
 Toda mensagem numa conversa longa reenvia a conversa inteira. Por isso conversas gigantes gastam o limite de uso muito mais rápido. Esta skill mantém as conversas curtas sem que o usuário perca nada.
 
@@ -29,17 +29,17 @@ Escreva uma nota curta (até ~800 palavras) com:
 ## Próximo passo
 ```
 
-- **Com o conector Memória Claude** (ferramentas `memoria_*`): salve com `memoria_salvar_handoff`, com `projeto` = um nome curto do assunto (ex.: "tcc", "loja-da-ana"). Diga ao usuário: "Salvo. Abra uma conversa nova e diga: continua de onde parei em <projeto>."
+- **Com o conector Rubi** (ferramentas `rubi_*`): salve com `rubi_salvar_handoff`, com `projeto` = um nome curto do assunto (ex.: "tcc", "loja-da-ana"). Diga ao usuário: "Salvo. Abra uma conversa nova e diga: continua de onde parei em <projeto>."
 - **Sem conector**: entregue a nota num único bloco de código e diga: "Copie isso, abra uma conversa nova e cole com: continua daqui."
 
 ## 3. Continuar numa conversa nova
 
 Se o usuário disser "continua de onde parei" (com ou sem projeto):
-- Com conector: `memoria_ultimo_handoff` (use `memoria_projetos` se não souber o nome) e siga a partir do próximo passo, sem pedir pra ele explicar de novo.
+- Com conector: `rubi_ultimo_handoff` (use `rubi_projetos` se não souber o nome) e siga a partir do próximo passo, sem pedir pra ele explicar de novo.
 - Se ele colar a nota: use-a como contexto e siga.
 
 ## 4. Lembrar coisas duráveis
 
-Se o usuário disser "lembra disso", ou surgir algo que vale pra outras conversas (preferência, decisão, dado fixo), salve com `memoria_salvar_nota` (com conector). Antes de pedir pra ele repetir algo que talvez já tenha contado, procure com `memoria_buscar`.
+Se o usuário disser "lembra disso", ou surgir algo que vale pra outras conversas (preferência, decisão, dado fixo), salve com `rubi_salvar_nota` (com conector). Antes de pedir pra ele repetir algo que talvez já tenha contado, procure com `rubi_buscar`.
 
 Nunca salve senhas, documentos pessoais ou dados de cartão.

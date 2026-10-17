@@ -25,27 +25,27 @@ function inicio(e) {
   if (e.source === 'compact') {
     // A compactação nativa acabou de resumir a conversa. Devolvemos o que o resumo genérico perde.
     if (h && (h.sessao === e.session_id || Date.now() - h.mtime < 6 * HORA)) {
-      partes.push(`[memoria-claude] A conversa foi compactada. Este é o handoff que você salvou antes (${h.caminho}). Continue a partir dele:\n\n${h.texto}`);
+      partes.push(`[rubi] A conversa foi compactada. Este é o handoff que você salvou antes (${h.caminho}). Continue a partir dele:\n\n${h.texto}`);
     }
     if (estado.ultimoRegistro) {
-      partes.push(`Registro automático do trecho compactado (pedidos, arquivos e comandos): ${estado.ultimoRegistro} — leia com memoria_ler se faltar algum detalhe.`);
+      partes.push(`Registro automático do trecho compactado (pedidos, arquivos e comandos): ${estado.ultimoRegistro} — leia com rubi_ler se faltar algum detalhe.`);
     }
     salvarEstado(e.session_id, { ...estado, avisado: false, proximoAviso: 0 });
   } else if (e.source === 'clear') {
     if (h && Date.now() - h.mtime < 48 * HORA) {
-      partes.push(`[memoria-claude] Nova janela. Último handoff do projeto "${projeto}" (${h.caminho}):\n\n${h.texto}`);
+      partes.push(`[rubi] Nova janela. Último handoff do projeto "${projeto}" (${h.caminho}):\n\n${h.texto}`);
     }
   } else {
     // startup/resume: só um ponteiro curto, pra não pesar no contexto fixo.
     const notas = titulosNotas(projeto);
     if (notas.length || h) {
-      let t = `[memoria-claude] Projeto "${projeto}" tem memória no vault.`;
+      let t = `[rubi] Projeto "${projeto}" tem memória no vault.`;
       if (notas.length) t += ` Notas: ${notas.slice(0, 30).join(' · ')}${notas.length > 30 ? ` (+${notas.length - 30})` : ''}.`;
       if (h) {
         const objetivo = h.texto.split('\n').find((l) => l.trim() && !l.startsWith('#'))?.trim().slice(0, 200);
-        t += ` Último handoff ${new Date(h.mtime).toLocaleString('pt-BR')}: "${objetivo}". Se o usuário quiser continuar de onde parou, use memoria_ultimo_handoff.`;
+        t += ` Último handoff ${new Date(h.mtime).toLocaleString('pt-BR')}: "${objetivo}". Se o usuário quiser continuar de onde parou, use rubi_ultimo_handoff.`;
       }
-      t += ' Antes de reexplorar o código, procure com memoria_buscar.';
+      t += ' Antes de reexplorar o código, procure com rubi_buscar.';
       partes.push(t);
     }
   }
@@ -68,9 +68,9 @@ function medidor(e) {
   }
   if (ctx < limite || (estado.avisado && cfg.compactaSozinho)) return;
 
-  let msg = `[memoria-claude] Contexto em ${fmt(ctx)} de ${fmt(cfg.janela)} tokens.`;
+  let msg = `[rubi] Contexto em ${fmt(ctx)} de ${fmt(cfg.janela)} tokens.`;
   if (!estado.avisado) {
-    msg += ' Salve AGORA um handoff com a skill "handoff" (ferramenta memoria_salvar_handoff): objetivo, estado atual, decisões, arquivos-chave e próximo passo. Faça isso sem parar pra perguntar ao usuário e depois siga o trabalho normalmente.';
+    msg += ' Salve AGORA um handoff com a skill "handoff" (ferramenta rubi_salvar_handoff): objetivo, estado atual, decisões, arquivos-chave e próximo passo. Faça isso sem parar pra perguntar ao usuário e depois siga o trabalho normalmente.';
   }
   if (!cfg.compactaSozinho) {
     msg += ` A compactação automática cedo não está ligada: depois do handoff, sugira ao usuário rodar /compact (ou /clear — o handoff volta sozinho na janela nova).`;
@@ -133,7 +133,7 @@ function guarda(e) {
   responder('PreToolUse', {
     permissionDecision: 'deny',
     permissionDecisionReason:
-      `[memoria-claude] ${path.basename(alvo)} tem ${t.linhas || '?'} linhas (~${fmt(tokens)} tokens) e ficaria no contexto até o fim da sessão, ` +
+      `[rubi] ${path.basename(alvo)} tem ${t.linhas || '?'} linhas (~${fmt(tokens)} tokens) e ficaria no contexto até o fim da sessão, ` +
       'sendo relido a cada mensagem. Use Grep pra achar o trecho certo, ou Read com offset/limit. ' +
       'Se precisar mesmo do arquivo inteiro, repita exatamente a mesma chamada que ela passa.',
   });
@@ -148,6 +148,6 @@ try {
   fs.mkdirSync(raizVault(), { recursive: true });
   ACOES[process.argv[2]]?.(e);
 } catch (err) {
-  if (process.env.MEMORIA_DEBUG) console.error(err);
+  if (process.env.RUBI_DEBUG) console.error(err);
 }
 process.exit(0);

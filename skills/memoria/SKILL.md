@@ -9,9 +9,9 @@ O vault guarda, por projeto: `notas/` (conhecimento durável), `handoffs/` (onde
 
 ## Buscar primeiro
 
-Antes de sair lendo vários arquivos pra entender algo, rode `memoria_buscar` com 2-4 palavras-chave. A busca devolve trechos curtos; abra só o que importar com `memoria_ler`. Se o usuário passou um assunto (`/memoria <assunto>`), busque e resuma o que achou.
+Antes de sair lendo vários arquivos pra entender algo, rode `rubi_buscar` com 2-4 palavras-chave. A busca devolve trechos curtos; abra só o que importar com `rubi_ler`. Se o usuário passou um assunto (`/memoria <assunto>`), busque e resuma o que achou.
 
-## O que salvar (`memoria_salvar_nota`)
+## O que salvar (`rubi_salvar_nota`)
 
 Salve quando descobrir algo que custaria caro redescobrir:
 - Decisão e o porquê ("usamos X e não Y porque...").

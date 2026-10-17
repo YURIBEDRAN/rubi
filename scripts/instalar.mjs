@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Configura o memoria-claude na máquina:
-//   1. escolhe a pasta do vault (~/.memoria-claude/config.json)
+// Configura o rubi na máquina:
+//   1. escolhe a pasta do vault (~/.rubi/config.json)
 //   2. liga a compactação automática cedo no ~/.claude/settings.json (com backup)
 // Uso: node instalar.mjs [--vault <pasta>] [--janela 150000] [--sim]
 //      node instalar.mjs --desfazer   (tira a compactação cedo do settings.json)
@@ -25,7 +25,7 @@ function lerSettings() {
 
 function gravarSettings(s) {
   fs.mkdirSync(path.dirname(SETTINGS), { recursive: true });
-  if (fs.existsSync(SETTINGS)) fs.copyFileSync(SETTINGS, `${SETTINGS}.bak-memoria`);
+  if (fs.existsSync(SETTINGS)) fs.copyFileSync(SETTINGS, `${SETTINGS}.bak-rubi`);
   fs.writeFileSync(SETTINGS, JSON.stringify(s, null, 2) + '\n');
 }
 
@@ -52,7 +52,7 @@ janela = Math.min(1e6, Math.max(1e5, janela || 150000));
 fs.mkdirSync(vault, { recursive: true });
 const leiame = path.join(vault, 'LEIA-ME.md');
 if (!fs.existsSync(leiame)) {
-  fs.writeFileSync(leiame, `# Vault do memoria-claude
+  fs.writeFileSync(leiame, `# Vault do rubi
 
 Uma pasta por projeto:
 
@@ -71,14 +71,14 @@ s.env = { ...(s.env || {}), [CHAVE]: String(janela) };
 gravarSettings(s);
 
 console.log(`
-memoria-claude configurado.
+rubi configurado.
   Vault:        ${vault}
   Config:       ${ARQ_CONFIG}
-  Compactação:  ${janela} tokens (${CHAVE} em ${SETTINGS}; backup em settings.json.bak-memoria)
+  Compactação:  ${janela} tokens (${CHAVE} em ${SETTINGS}; backup em settings.json.bak-rubi)
 
 Agora instale o plugin dentro do Claude Code:
-  /plugin marketplace add YURIBEDRAN/memoria-claude
-  /plugin install memoria-claude@memoria-claude
+  /plugin marketplace add YURIBEDRAN/rubi
+  /plugin install rubi@rubi
 
 Vale pras sessões novas. Pra desfazer a compactação cedo: node scripts/instalar.mjs --desfazer
 `);

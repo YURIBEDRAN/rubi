@@ -1,15 +1,15 @@
 // Configuração compartilhada: onde fica o vault, o estado e os limites.
-// Ordem de prioridade: variável de ambiente > ~/.memoria-claude/config.json > padrão.
+// Ordem de prioridade: variável de ambiente > ~/.rubi/config.json > padrão.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-export const HOME_MEMORIA = process.env.MEMORIA_HOME || path.join(os.homedir(), '.memoria-claude');
+export const HOME_MEMORIA = process.env.RUBI_HOME || path.join(os.homedir(), '.rubi');
 export const ARQ_CONFIG = path.join(HOME_MEMORIA, 'config.json');
 
 const PADRAO = {
-  vault: path.join(os.homedir(), 'memoria-claude-vault'),
+  vault: path.join(os.homedir(), 'rubi-vault'),
   janela: 150000, // tokens em que a sessão deve compactar
   avisoPct: 0.8, // a partir de quanto da janela o medidor pede o handoff
   guarda: { ativa: true, maxLinhas: 800, maxBytes: 80000 },
@@ -19,7 +19,7 @@ export function lerConfig() {
   let arq = {};
   try { arq = JSON.parse(fs.readFileSync(ARQ_CONFIG, 'utf8')); } catch {}
   const c = { ...PADRAO, ...arq, guarda: { ...PADRAO.guarda, ...(arq.guarda || {}) } };
-  if (process.env.MEMORIA_VAULT) c.vault = process.env.MEMORIA_VAULT;
+  if (process.env.RUBI_VAULT) c.vault = process.env.RUBI_VAULT;
   const janelaEnv = Number(process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW);
   if (janelaEnv > 0) c.janela = janelaEnv;
   c.compactaSozinho = janelaEnv > 0;

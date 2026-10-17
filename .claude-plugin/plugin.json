@@ -1,10 +1,10 @@
 {
-  "name": "memoria-claude",
-  "version": "0.1.0",
+  "name": "rubi",
+  "version": "0.2.0",
   "description": "Gaste menos token sem perder o fio: compactação cedo com handoff automático, memória em markdown (Obsidian), guarda de leitura e raio-X de gasto.",
   "author": { "name": "Yuri Bedran", "url": "https://github.com/YURIBEDRAN" },
-  "homepage": "https://github.com/YURIBEDRAN/memoria-claude",
-  "repository": "https://github.com/YURIBEDRAN/memoria-claude",
+  "homepage": "https://github.com/YURIBEDRAN/rubi",
+  "repository": "https://github.com/YURIBEDRAN/rubi",
   "license": "MIT",
   "keywords": ["memory", "context", "tokens", "obsidian", "handoff", "compaction"]
 }

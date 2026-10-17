@@ -100,7 +100,7 @@ if (real) {
 console.log('\nSugestões:');
 const sug = [];
 const claudeMd = itens.filter((i) => i.grupo === 'CLAUDE.md');
-for (const c of claudeMd) if (c.tokens > 2500) sug.push(`${c.nome} tem ${fmt(c.tokens)} tokens. Deixe só regras que valem sempre; detalhes viram notas no vault (memoria_salvar_nota) e são buscados quando precisar.`);
+for (const c of claudeMd) if (c.tokens > 2500) sug.push(`${c.nome} tem ${fmt(c.tokens)} tokens. Deixe só regras que valem sempre; detalhes viram notas no vault (rubi_salvar_nota) e são buscados quando precisar.`);
 if (memoria && memoria.split('\n').length > 150) sug.push('MEMORY.md passa de 150 linhas: só as primeiras 200 entram. Junte ou apague entradas velhas.');
 const skills = itens.filter((i) => i.grupo === 'Skills').reduce((s, i) => s + i.tokens, 0);
 if (skills > 3000) sug.push(`Descrições de skills somam ~${fmt(skills)}. Desinstale plugins/skills que não usa (/plugin) ou encurte as descrições.`);
