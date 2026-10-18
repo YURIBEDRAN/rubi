@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Servidor MCP do Rubi, sem dependências.
-//   node mcp-server.mjs                      -> stdio (Claude Code e app de desktop)
+//   node mcp-server.mjs                      -> stdio (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor e qualquer cliente MCP)
 //   node mcp-server.mjs --http --porta 8787  -> HTTP pra conector remoto (site e celular)
 //      precisa de RUBI_TOKEN; o endpoint fica em /mcp/<token>
 
@@ -18,39 +18,43 @@ const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const MODO_HTTP = args.includes('--http');
 const MODO_APP = MODO_HTTP || process.env.RUBI_MODO === 'app';
-const VERSAO = '0.3.2';
+const VERSAO = '0.4.0';
 
-// Onde ler e escrever: no Claude Code, a pasta .rubi do projeto; no app, o vault.
+// Pasta do projeto: RUBI_PROJECT_DIR, CLAUDE_PROJECT_DIR, os "roots" que o cliente MCP informa, ou a pasta atual.
+let DIR_PROJETO = process.env.RUBI_PROJECT_DIR || process.env.CLAUDE_PROJECT_DIR || null;
+let CLIENTE = '';
+
+// Onde ler e escrever: no modo projeto, a pasta .rubi do projeto; no app, o vault.
 function alvo(projeto) {
   const mp = memoriaPessoal();
   if (MODO_APP) return { m: memoriaApp(projeto || '_geral'), mp, raiz: null, nome: projeto || '_geral' };
-  const raiz = raizProjeto();
-  return raiz ? { m: path.join(raiz, '.rubi'), mp, raiz, nome: nomeProjeto() } : { m: mp, mp, raiz: null, nome: '_pessoal' };
+  const raiz = raizProjeto(DIR_PROJETO || undefined);
+  return raiz ? { m: path.join(raiz, '.rubi'), mp, raiz, nome: nomeProjeto(raiz) } : { m: mp, mp, raiz: null, nome: '_pessoal' };
 }
 const codigoDe = (a) => (a.raiz ? indiceFresco(a.m, a.raiz) : lerIndice(a.m)?.codigo || { arquivos: {}, modulos: {} });
 
 const txt = (t) => ({ content: [{ type: 'text', text: t }] });
-const projetoProp = MODO_APP ? { projeto: { type: 'string', description: 'Nome curto do projeto/assunto (ex.: "tcc", "loja"). Padrão: "_geral".' } } : {};
+const projetoProp = MODO_APP ? { projeto: { type: 'string', description: 'Short project/topic name (e.g. "thesis", "store"). Default: "_geral".' } } : {};
 
 const FATO = {
   type: 'object',
   properties: {
     tipo: { type: 'string', enum: TIPOS },
-    titulo: { type: 'string', description: 'Curto e estável, vira o nome do nó ("Usar JWT em vez de sessão").' },
-    texto: { type: 'string', description: 'O fato e o PORQUÊ, em 1-4 frases.' },
-    arquivos: { type: 'array', items: { type: 'string' }, description: 'Arquivos de onde o fato vem ou que ele afeta.' },
+    titulo: { type: 'string', description: 'Short and stable; becomes the node name ("Use JWT instead of sessions").' },
+    texto: { type: 'string', description: 'The fact and the WHY, in 1-4 sentences.' },
+    arquivos: { type: 'array', items: { type: 'string' }, description: 'Files the fact comes from or affects.' },
     liga: {
       type: 'array',
       items: {
         type: 'object',
         properties: {
-          rel: { type: 'string', description: 'sobre, depende_de, causa, corrige, usa, parte_de, contradiz, relacionado' },
-          alvo: { type: 'string', description: 'Título de outro nó, caminho de arquivo ou nome de módulo.' },
+          rel: { type: 'string', description: 'sobre (about), depende_de (depends on), causa (causes), corrige (fixes), usa (uses), parte_de (part of), contradiz (contradicts), relacionado (related)' },
+          alvo: { type: 'string', description: 'Title of another node, a file path or a module name.' },
         },
         required: ['alvo'],
       },
     },
-    substitui: { type: 'string', description: 'Título do fato antigo que este substitui (o antigo é marcado, não apagado).' },
+    substitui: { type: 'string', description: 'Title of the older fact this one replaces (the old one is marked superseded, never deleted).' },
     status: { type: 'string', enum: ['ativo', 'resolvido'] },
   },
   required: ['tipo', 'titulo', 'texto'],
@@ -59,14 +63,14 @@ const FATO = {
 const FERRAMENTAS = [
   {
     name: 'rubi_contexto',
-    description: 'Busca no conhecimento do projeto (decisões, bugs, armadilhas, conceitos, handoffs) e no mapa do código, combinando texto, nomes de arquivo/função e vizinhança no grafo. Use ANTES de explorar o código. Mande em `termos` sinônimos e palavras relacionadas que você imagina: é isso que faz a busca entender significado. Devolve trechos curtos dentro do orçamento.',
+    description: 'Search the project memory (decisions, bugs, gotchas, concepts, handoffs) and the code map, combining text, file/function names and graph neighborhood. Use it BEFORE exploring the code. Put synonyms and related words you can think of in `termos`: that is what makes the search understand meaning. Returns short snippets within a token budget.',
     inputSchema: {
       type: 'object',
       properties: {
         pergunta: { type: 'string' },
-        termos: { type: 'array', items: { type: 'string' }, description: '3-8 sinônimos, termos técnicos, nomes prováveis de função/arquivo.' },
-        arquivos: { type: 'array', items: { type: 'string' }, description: 'Arquivos que você já sabe que importam.' },
-        orcamento: { type: 'number', description: 'Máximo de tokens na resposta (padrão 1500).' },
+        termos: { type: 'array', items: { type: 'string' }, description: '3-8 synonyms, technical terms, likely function/file names.' },
+        arquivos: { type: 'array', items: { type: 'string' }, description: 'Files you already know are relevant.' },
+        orcamento: { type: 'number', description: 'Max tokens in the answer (default 1500).' },
         incluir_substituidos: { type: 'boolean' },
         ...projetoProp,
       },
@@ -82,12 +86,12 @@ const FERRAMENTAS = [
   },
   {
     name: 'rubi_registrar',
-    description: 'Guarda conhecimento durável como nós de um grafo: decisões (com o porquê), bugs e correções, armadilhas, conceitos do domínio, preferências, como fazer. Ligue aos arquivos e a outros nós. Se uma decisão mudou, use `substitui`. Duplicados são unidos automaticamente. Nunca guarde segredos.',
+    description: 'Store durable knowledge as graph nodes: decisions (with the why), bugs and fixes, gotchas (armadilha), domain concepts, preferences, how-tos (como-fazer). Link them to files and to other nodes. If a decision changed, use `substitui`. Duplicates are merged automatically. Never store secrets.',
     inputSchema: {
       type: 'object',
       properties: {
         fatos: { type: 'array', items: FATO },
-        escopo: { type: 'string', enum: ['projeto', 'pessoal'], description: '"pessoal" = vale em todos os projetos (preferências do usuário).' },
+        escopo: { type: 'string', enum: ['projeto', 'pessoal'], description: '"pessoal" = applies to every project (user preferences).' },
         ...projetoProp,
       },
       required: ['fatos'],
@@ -103,7 +107,7 @@ const FERRAMENTAS = [
   },
   {
     name: 'rubi_mapa',
-    description: 'Mapa do projeto em níveis. Sem `modulo`: visão geral (módulos, arquivos centrais, conhecimento). Com `modulo`: arquivos, dependências e conhecimento daquele módulo.',
+    description: 'Project map in zoom levels. Without `modulo`: overview (modules, central files ranked by PageRank, stored knowledge). With `modulo`: files, dependencies and knowledge of that module. Call it once at the start of a task.',
     inputSchema: { type: 'object', properties: { modulo: { type: 'string' }, ...projetoProp } },
     run: ({ modulo, projeto }) => {
       const a = alvo(projeto);
@@ -113,7 +117,7 @@ const FERRAMENTAS = [
   },
   {
     name: 'rubi_escrever_resumo',
-    description: 'Escreve o resumo curado do projeto (alvo "mapa": 3-6 linhas — o que é, stack, como rodar) ou de um módulo (alvo "modulo:<nome>": 2-5 linhas — responsabilidade, entradas, cuidados). Fica preservado quando o mapa é recalculado.',
+    description: 'Write the curated summary of the project (alvo "mapa": 3-6 lines, what it is, stack, how to run) or of a module (alvo "modulo:<name>": 2-5 lines, responsibility and caveats). Preserved when the map is rebuilt.',
     inputSchema: { type: 'object', properties: { alvo: { type: 'string' }, texto: { type: 'string' }, ...projetoProp }, required: ['alvo', 'texto'] },
     run: ({ alvo: qual, texto, projeto }) => {
       const a = alvo(projeto);
@@ -122,7 +126,7 @@ const FERRAMENTAS = [
   },
   {
     name: 'rubi_ler',
-    description: 'Abre um item da memória pelo caminho que a busca ou o mapa mostraram (ex.: conhecimento/decisao-x.md). Prefixe "pessoal:" pra memória pessoal.',
+    description: 'Open a memory item by the path shown by the search or the map (e.g. conhecimento/decisao-x.md). Prefix "pessoal:" for the personal memory.',
     inputSchema: { type: 'object', properties: { caminho: { type: 'string' }, ...projetoProp }, required: ['caminho'] },
     run: ({ caminho, projeto }) => {
       const a = alvo(projeto);
@@ -131,7 +135,7 @@ const FERRAMENTAS = [
   },
   {
     name: 'rubi_salvar_handoff',
-    description: 'Salva o "onde paramos" pra continuar depois da compactação ou numa janela nova. Markdown curto: Objetivo, Estado atual, Decisões, Arquivos-chave, Próximo passo, Armadilhas.',
+    description: 'Save "where we left off" to continue after a context reset or in a new session. Short markdown: Goal, Current state, Decisions, Key files, Next step, Gotchas.',
     inputSchema: { type: 'object', properties: { conteudo: { type: 'string' }, arquivos: { type: 'array', items: { type: 'string' } }, ...projetoProp }, required: ['conteudo'] },
     run: ({ conteudo, arquivos, projeto }, ctx) => {
       const a = alvo(projeto);
@@ -142,7 +146,7 @@ const FERRAMENTAS = [
   },
   {
     name: 'rubi_ultimo_handoff',
-    description: 'Devolve o handoff mais recente, pra continuar de onde parou.',
+    description: 'Return the most recent handoff, to continue where you left off.',
     inputSchema: { type: 'object', properties: { ...projetoProp } },
     run: ({ projeto }) => {
       const h = ultimoHandoff(alvo(projeto).m);
@@ -154,7 +158,7 @@ const FERRAMENTAS = [
 if (MODO_APP) {
   FERRAMENTAS.push({
     name: 'rubi_projetos',
-    description: 'Lista os projetos/assuntos guardados, com contagem de conhecimento e handoffs.',
+    description: 'List stored projects/topics with knowledge and handoff counts.',
     inputSchema: { type: 'object', properties: {} },
     run: () => {
       const ps = listarProjetosApp();
@@ -166,34 +170,56 @@ if (MODO_APP) {
   FERRAMENTAS.push(
     {
       name: 'rubi_raio_x',
-      description: 'Raio-X de gasto de token dos últimos N dias do Claude Code: composição do custo, sessões mais caras, ferramentas que mais pesam e simulação de economia.',
+      description: 'Token X-ray of the last N days of Claude Code: cost breakdown, priciest sessions, heaviest tools and a savings simulation. Claude Code only.',
       inputSchema: { type: 'object', properties: { dias: { type: 'number' } } },
       run: ({ dias = 30 }) => txt(script('raio-x.mjs', ['--dias', String(dias)])),
     },
     {
       name: 'rubi_auditar',
-      description: 'Mede o que entra fixo em toda sessão (CLAUDE.md, memória, skills, MCPs) e sugere cortes.',
+      description: 'Measure the fixed context loaded into every session (CLAUDE.md, memory, skills, MCP) and suggest cuts. Claude Code only.',
       inputSchema: { type: 'object', properties: {} },
-      run: () => txt(script('auditar.mjs', [process.env.CLAUDE_PROJECT_DIR || process.cwd()])),
+      run: () => txt(script('auditar.mjs', [DIR_PROJETO || process.cwd()])),
     },
   );
 }
 
 // ---- JSON-RPC ----
+const INSTRUCOES = {
+  app: "Rubi is the user's memory: a knowledge graph per project, stored as markdown. When the user mentions Rubi, or asks to remember, store, recall or continue where they left off, use rubi_registrar, rubi_contexto and rubi_ultimo_handoff. When the conversation gets long, offer to save a handoff with rubi_salvar_handoff.",
+  claude: 'Rubi: project map and knowledge graph. Before exploring, rubi_contexto (with related terms). When you learn something durable, rubi_registrar. Long conversation: rubi_salvar_handoff.',
+  outro: "Rubi is this project's map and memory (a knowledge graph). 1) At the start of a task, call rubi_mapa once to see the modules, central files and stored knowledge. 2) Before exploring the code, call rubi_contexto with the question plus related terms: it may already know the answer or point to the right file. 3) When you learn something that would be expensive to rediscover (a decision and why, a bug and its fix, a gotcha, how something works), call rubi_registrar, linking it to the files. 4) Before the context gets long or the session ends, save rubi_salvar_handoff.",
+};
+
+let CAPS_CLIENTE = {};
+let seqPedido = 0;
+// Pede ao cliente as pastas do workspace (MCP roots) quando ele suporta e ninguém fixou a pasta.
+function pedirRoots(enviar) {
+  if (!enviar || !CAPS_CLIENTE.roots || process.env.RUBI_PROJECT_DIR || process.env.CLAUDE_PROJECT_DIR) return;
+  enviar({ jsonrpc: '2.0', id: `rubi-roots-${++seqPedido}`, method: 'roots/list' });
+}
+
 async function tratar(msg, ctx) {
   const { id, method, params = {} } = msg;
   const ok = (result) => ({ jsonrpc: '2.0', id, result });
   const erro = (code, message) => ({ jsonrpc: '2.0', id, error: { code, message } });
-  if (id === undefined || id === null) return null; // notificação
+  // resposta do cliente a um pedido nosso (roots/list)
+  if (!method) {
+    const raiz = msg.result?.roots?.find((r) => String(r.uri).startsWith('file:'));
+    if (raiz) { try { DIR_PROJETO = fileURLToPath(raiz.uri); } catch {} }
+    return null;
+  }
+  if (method === 'notifications/initialized' || method === 'notifications/roots/list_changed') { pedirRoots(ctx.enviar); return null; }
+  if (id === undefined || id === null) return null; // outras notificações
   switch (method) {
     case 'initialize':
+      CAPS_CLIENTE = params.capabilities || {};
+      CLIENTE = String(params.clientInfo?.name || '').toLowerCase();
       return ok({
         protocolVersion: params.protocolVersion || '2025-06-18',
         capabilities: { tools: {} },
         serverInfo: { name: 'rubi', version: VERSAO },
-        instructions: MODO_APP
-          ? 'Rubi é a memória do usuário, um grafo de conhecimento por projeto guardado em markdown. Quando ele mencionar o Rubi, pedir pra lembrar, guardar, retomar ou continuar de onde parou, use rubi_registrar, rubi_contexto e rubi_ultimo_handoff. Quando a conversa ficar longa, ofereça salvar um handoff com rubi_salvar_handoff.'
-          : 'Rubi: mapa e grafo de conhecimento do projeto. Antes de explorar, rubi_contexto (com termos relacionados). Ao aprender algo durável, rubi_registrar. Conversa longa: rubi_salvar_handoff.',
+        // no Claude Code os hooks já injetam o mapa e lembram sozinhos; nos outros clientes a instrução faz esse papel
+        instructions: MODO_APP ? INSTRUCOES.app : CLIENTE.includes('claude-code') ? INSTRUCOES.claude : INSTRUCOES.outro,
       });
     case 'ping':
       return ok({});
@@ -247,7 +273,7 @@ if (MODO_HTTP) {
       let msg;
       try { msg = JSON.parse(linha); } catch { continue; }
       fila = fila.then(async () => {
-        const r = await tratar(msg, { sessao: process.env.CLAUDE_SESSION_ID });
+        const r = await tratar(msg, { sessao: process.env.CLAUDE_SESSION_ID, enviar: (o) => process.stdout.write(JSON.stringify(o) + '\n') });
         if (r) process.stdout.write(JSON.stringify(r) + '\n');
       });
     }

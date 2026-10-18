@@ -2,7 +2,7 @@
   <img src="docs/assets/hero.svg" alt="Rubi: only what's precious stays in context" width="100%">
 </p>
 
-<h3 align="center">A knowledge graph and context manager for Claude.<br>Shorter sessions, organized projects, fewer tokens.</h3>
+<h3 align="center">A knowledge graph and context manager for AI coding agents.<br>Claude, Codex, Gemini, Cursor, Copilot and local models.<br>Shorter sessions, organized projects, fewer tokens.</h3>
 
 <p align="center">
   <a href="https://yuribedran.github.io/rubi/"><b>Live demo</b></a> ·
@@ -15,7 +15,9 @@
 <p align="center">
   <img alt="Claude Code plugin" src="https://img.shields.io/badge/Claude%20Code-plugin-e0245e?style=flat-square">
   <img alt="Claude Desktop" src="https://img.shields.io/badge/Claude%20Desktop-extension-e0245e?style=flat-square">
-  <img alt="claude.ai" src="https://img.shields.io/badge/claude.ai-coming%20soon-8b93a7?style=flat-square">
+  <img alt="Codex" src="https://img.shields.io/badge/Codex-MCP%20%2B%20hooks-e0245e?style=flat-square">
+  <img alt="Gemini CLI, Cursor, Copilot and more" src="https://img.shields.io/badge/Gemini%20%C2%B7%20Cursor%20%C2%B7%20Copilot%20%C2%B7%20more-MCP-e0245e?style=flat-square">
+  <img alt="Local models" src="https://img.shields.io/badge/local%20models-Ollama%20%C2%B7%20LM%20Studio-3ccf91?style=flat-square">
   <img alt="Zero dependencies" src="https://img.shields.io/badge/dependencies-0-3ccf91?style=flat-square">
   <a href="https://github.com/YURIBEDRAN/rubi/actions/workflows/testes.yml"><img alt="Tests: Windows, macOS, Linux" src="https://github.com/YURIBEDRAN/rubi/actions/workflows/testes.yml/badge.svg"></a>
   <img alt="MIT" src="https://img.shields.io/badge/license-MIT-8b93a7?style=flat-square">
@@ -32,7 +34,7 @@ AI coding assistants are billed for every token they read, and in a long convers
 1. **Keep sessions short without losing the thread.** It compacts early, saves a *handoff* before each compaction and restores it right after.
 2. **Make the project easy to find your way around, so less reading is needed.** It builds a **map of the code** (imports and centrality via PageRank) and a **temporal knowledge graph** of decisions, bugs, gotchas and concepts. The graph is written by Claude itself, at the moment it already holds that knowledge in context, and searched with a hybrid of BM25, Personalized PageRank and Reciprocal Rank Fusion, within a token budget. Relevant knowledge is **recalled automatically** on every request, before Claude starts exploring.
 
-Everything is plain markdown inside the project (`.rubi/`), opens as an Obsidian graph, and runs locally with zero dependencies.
+Everything is plain markdown inside the project (`.rubi/`), opens as an Obsidian graph, and runs locally with zero dependencies. It was built for Claude Code and, because its core is a standard MCP server, it also runs in **Codex, Gemini CLI, Cursor, GitHub Copilot, Windsurf, Cline, OpenCode, Continue, Goose and Zed**, with hosted or **local models** ([see the table](#codex-gemini-cli-cursor-copilot-and-other-agents)).
 
 **Results.** Two studies, reported as measured, including what did not work:
 
@@ -405,7 +407,7 @@ rubi_registrar → criado: conhecimento/bug-cupom-aplicado-duas-vezes.md
 - **Code map is regex-based**, not a full parser (no tree-sitter, to keep zero dependencies). Imports are resolved for JS/TS (relative and `@/` aliases), Python, Go, Rust, Java/Kotlin, PHP, Ruby, C/C++, CSS and Dart. Dynamic imports and exotic aliases may be missed.
 - **No vector embeddings.** Meaning comes from Claude's own query expansion. For very large knowledge bases (tens of thousands of nodes), an embedding index could be added later; the JSON index can also be swapped for SQLite FTS5.
 - **Hooks cannot run `/clear` or `/compact`**, nor edit Claude Code's compaction summary. Rubi works around it: Claude Code compacts at the threshold you set, and Rubi handles what happens before and after.
-- **Platforms.** Fully supported in Claude Code. In the Claude Desktop app, Rubi provides the memory tools but not the hooks or the code map. The website and mobile app are not supported yet.
+- **Platforms.** The benchmark was run on Claude Code only. Claude Code and Codex were tested end to end; the other agents are configured from their official docs and not yet tested end to end. Agents without context-injecting hooks rely on the model following instructions. The Claude website and mobile app are not supported yet.
 
 ---
 
@@ -469,6 +471,42 @@ To try Rubi without installing it: `claude --plugin-dir path/to/rubi`.
 If Claude says it can't find a tool called Rubi, the extension is turned off: switch it on in Settings → Extensions and start a new conversation.
 
 In the Desktop app, Rubi provides the **memory**: the knowledge graph, hybrid search and handoffs. The code map and the automatic hooks (recall, meter, harvest, early compaction) need Claude Code. Claude Desktop also has its own built-in memory, so mention Rubi when you want something stored there.
+
+### Codex, Gemini CLI, Cursor, Copilot and other agents
+
+Rubi's core is a standard **MCP server**, so it works in any coding agent that speaks MCP, with the vendor's models or with **local models**. One command connects it:
+
+```bash
+git clone https://github.com/YURIBEDRAN/rubi
+cd your-project
+node /path/to/rubi/scripts/conectar.mjs codex     # or: gemini, cursor, vscode, windsurf, cline, opencode, continue, goose, zed
+```
+
+For each agent it registers the MCP server in that agent's config (keeping a `.bak-rubi` backup), writes the instructions into the file the agent reads on its own (`AGENTS.md`, `GEMINI.md`, `.cursor/rules/rubi.mdc`...) and, where the agent supports hooks that feed context to the model, turns on the **map at session start** and the **automatic recall** on every request. Formats that are risky to edit automatically (YAML, JSON with comments) are printed for you to paste. Use `--so-mostrar` to only print, never write. `--listar` shows all agents.
+
+| Agent | Memory tools (MCP) | Map + recall automatically | Instructions file | Local models | Tested end to end |
+|---|---|---|---|---|---|
+| **Claude Code** | yes (plugin) | yes, plus meter, harvest, early compaction, read guard | `CLAUDE.md` | yes (Ollama, LM Studio) | **yes** |
+| **Claude Desktop** | yes (`rubi.mcpb`) | no hooks in the app | – | – | **yes** |
+| **OpenAI Codex** | yes | yes (hooks) | `AGENTS.md` | yes (`codex --oss`, Ollama, LM Studio) | **yes** (MCP and hooks) |
+| **Gemini CLI** | yes | yes (hooks) | `GEMINI.md` | – | configured from docs |
+| **Cursor** | yes | via instructions | `.cursor/rules/rubi.mdc` | – | configured from docs |
+| **GitHub Copilot (VS Code)** | yes, per project | via instructions | `AGENTS.md` | yes (bring your own key) | configured from docs |
+| **Windsurf** | yes | via instructions | `AGENTS.md` | – | configured from docs |
+| **Cline** | yes | via instructions | `AGENTS.md` | yes | configured from docs |
+| **OpenCode** | yes | via instructions | `AGENTS.md` | yes | configured from docs |
+| **Continue** | yes, per project (agent mode) | via instructions | `.continue/rules/rubi.md` | yes | snippet to paste |
+| **Goose** | yes | via instructions | `AGENTS.md` | yes | snippet to paste |
+| **Zed** | yes | via instructions | `AGENTS.md` | yes | snippet to paste |
+
+"Via instructions" means the agent is told, through its instructions file and the MCP server's own instructions, to open the map at the start of a task, search the memory before exploring and register what it learns. It works, but it relies on the model following instructions, while hooks do it automatically.
+
+> [!NOTE]
+> **Codex** asks you to approve new hooks once: open Codex and type `/hooks` to review and trust Rubi's two hooks.
+>
+> **Local models** need to support tool calling. In our tests a 4B model (qwen3:4b on Ollama) called Rubi's tools and stored knowledge correctly, but often ignored the injected context. Use 8B+ models for real work.
+
+How the server finds your project in each agent: `RUBI_PROJECT_DIR` if set, then the workspace folders the agent reports through MCP *roots*, then the folder it was launched in.
 
 ### claude.ai and mobile: coming soon
 

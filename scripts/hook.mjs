@@ -17,7 +17,8 @@ import { contextoAtual, registroSessao, registroEmMarkdown } from './lib/transcr
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const fmt = (n) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
 const HORA = 36e5;
-const F = (n) => `mcp__plugin_rubi_rubi__${n}`;
+// No plugin do Claude Code as ferramentas têm prefixo; nos outros agentes (Codex, Gemini...) o nome é o simples.
+const F = (n) => (process.env.CLAUDE_PLUGIN_ROOT ? `mcp__plugin_rubi_rubi__${n}` : n);
 const GUIA = `Antes de explorar o código, consulte a memória: ${F('rubi_contexto')} (mande termos relacionados). Aprendeu algo durável (como algo funciona, decisão e porquê, bug, armadilha): ${F('rubi_registrar')}. Pergunta ampla sobre o código: agente rubi-pesquisador.`;
 
 function responder(evento, extra) {
@@ -107,7 +108,8 @@ function lembrar(e) {
   const partes = [];
   const cfg = lerConfig();
   const raiz = raizProjeto(e.cwd);
-  const prompt = String(e.prompt || '');
+  // Claude Code e Codex mandam `prompt`; outros agentes usam nomes parecidos
+  const prompt = String(e.prompt || e.user_prompt || e.userPrompt || e.input || '');
   if (cfg.lembranca !== false && raiz && prompt.trim().length >= 12 && !prompt.trim().startsWith('/')) {
     const m = memoriaDoProjeto(e.cwd);
     const codigo = lerIndice(m)?.codigo || { arquivos: {}, modulos: {} };
@@ -116,7 +118,7 @@ function lembrar(e) {
   }
   const msg = medidor(e);
   if (msg) partes.push(msg);
-  if (partes.length) responder('UserPromptSubmit', { additionalContext: partes.join('\n\n') });
+  if (partes.length) responder(e.hook_event_name || 'UserPromptSubmit', { additionalContext: partes.join('\n\n') });
 }
 
 // PreCompact: salva o registro objetivo do trecho que vai sumir, ligado aos arquivos mexidos.

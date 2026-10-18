@@ -52,7 +52,7 @@ export function salvarEstado(sessao, estado) {
 }
 
 // Raiz do projeto: a pasta raiz do git, senão a pasta atual. Na home não há projeto (null).
-export function raizProjeto(dir = process.env.CLAUDE_PROJECT_DIR || process.cwd()) {
+export function raizProjeto(dir = process.env.RUBI_PROJECT_DIR || process.env.CLAUDE_PROJECT_DIR || process.cwd()) {
   const d = path.resolve(dir);
   if (d === path.resolve(os.homedir())) return null;
   for (let atual = d; ; ) {

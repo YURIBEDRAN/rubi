@@ -8,11 +8,12 @@
     {
       "name": "rubi",
       "source": "./",
-      "description": "Keeps Claude sessions short without losing the thread: early compaction with automatic handoffs, a markdown memory vault (Obsidian), a read guard and a token X-ray."
+      "description": "Knowledge graph and context manager for AI coding agents (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Copilot, local models): early compaction with handoffs, code map with PageRank, temporal knowledge graph, hybrid search.",
+      "version": "0.4.0"
     }
   ],
   "metadata": {
     "description": "Context-saving memory plugins for Claude Code",
-    "version": "0.3.2"
+    "version": "0.4.0"
   }
 }

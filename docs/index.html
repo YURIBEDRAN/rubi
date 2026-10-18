@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rubi · Interactive demo</title>
+<title>Rubi · Knowledge graph for AI coding agents</title>
 <meta name="description" content="Watch a Claude Code session with and without Rubi: context size, compaction, handoffs and token cost, side by side.">
 <style>
   :root {
@@ -68,6 +68,26 @@
   .save .big { font-size: 44px; font-weight: 800; color: var(--ruby-2); font-family: var(--mono); letter-spacing: -.02em; }
   .save p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 
+  .calc { padding: 20px; display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; align-items: start; }
+  .calc label { display: block; font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+  .calc input[type=text] { width: 100%; background: #07080c; border: 1px solid var(--line); border-radius: 10px; color: var(--text);
+    font: 600 18px var(--mono); padding: 12px 14px; margin-bottom: 14px; }
+  .calc input[type=text]:focus { outline: 2px solid var(--ruby); border-color: transparent; }
+  .calc .hint { font-size: 12.5px; color: var(--gray); line-height: 1.5; margin: 0; }
+  .calc .hint code { font-family: var(--mono); background: var(--panel-2); padding: 1px 5px; border-radius: 5px; color: var(--text); }
+  .res { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .res .card { padding: 14px; }
+  .res .k { font: 800 30px var(--mono); letter-spacing: -.02em; color: var(--ruby-2); }
+  .res .k.ok { color: var(--ok); }
+  .res .l { font-size: 12.5px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  .bigbar { grid-column: 1 / -1; padding: 14px; }
+  .bigbar .track { height: 22px; border-radius: 11px; }
+  .bigbar .fill { border-radius: 11px; }
+  .bigbar .lg { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+  .share { grid-column: 1 / -1; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .share small { color: var(--gray); font-size: 12px; }
+  @media (max-width: 860px) { .calc { grid-template-columns: 1fr; } }
+
   .log { margin-top: 14px; padding: 12px 14px; font: 12.5px/1.65 var(--mono); height: 168px; overflow: hidden; position: relative; }
   .log::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 30px; background: linear-gradient(var(--panel), transparent); }
   .log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: in .25s ease-out; }
@@ -122,7 +142,8 @@
     <h1>Rubi</h1>
     <p class="tag"><b>Only what's precious stays in context.</b> Rubi keeps Claude sessions short on its own, saves a handoff before every compaction and brings it back right after. You spend fewer tokens and never lose the thread.</p>
     <div class="cta">
-      <a class="btn primary" href="#demo">▶ Watch the demo</a>
+      <a class="btn primary" href="#calc">Check your usage</a>
+      <a class="btn" href="#demo">▶ Watch the demo</a>
       <a class="btn" href="#install">Install</a>
       <a class="btn" href="https://github.com/YURIBEDRAN/rubi">GitHub</a>
     </div>
@@ -130,6 +151,34 @@
 </header>
 
 <main class="wrap">
+  <section id="calc">
+    <h2>How much of your Claude is just re-reading?</h2>
+    <p class="sub">Run <code style="font-family:var(--mono)">/stats</code> in Claude Code and type two numbers from it. Nothing leaves your browser.</p>
+    <div class="card calc">
+      <div>
+        <label for="tot">Total tokens</label>
+        <input id="tot" type="text" value="44.5b" autocomplete="off" spellcheck="false">
+        <label for="cr">Cache read</label>
+        <input id="cr" type="text" value="43.4b" autocomplete="off" spellcheck="false">
+        <p class="hint">Accepts <code>44.5b</code>, <code>812m</code>, <code>350k</code> or plain numbers. The example is the author's real usage since March 2026.</p>
+      </div>
+      <div class="res">
+        <div class="card bigbar">
+          <div class="track"><div class="fill ruby" id="c-bar" style="width:0"></div></div>
+          <div class="lg"><span>re-reading the conversation</span><span>actual new work</span></div>
+        </div>
+        <div class="card"><div class="k" id="c-pct">–</div><div class="l">of your tokens were Claude re-reading the conversation</div></div>
+        <div class="card"><div class="k" id="c-reread">–</div><div class="l">tokens re-read</div></div>
+        <div class="card"><div class="k ok" id="c-saved">–</div><div class="l">tokens Rubi would spare you (conservative projection, −20%)</div></div>
+        <div class="card"><div class="k ok" id="c-limit">–</div><div class="l">more work from the same usage limit</div></div>
+        <div class="share">
+          <button class="btn primary" id="c-copy">Copy my result</button>
+          <a class="btn" href="https://github.com/YURIBEDRAN/rubi#7-install">Install Rubi</a>
+          <small>Projection from a 90-session A/B benchmark (−37% context re-read with a mature project memory). Your results will vary.</small>
+        </div>
+      </div>
+    </div>
+  </section>
   <section id="demo">
     <h2>One session, two timelines</h2>
     <p class="sub">Every message re-sends the whole conversation. Watch the same long session with and without Rubi. Drag the sliders to match how you work.</p>
@@ -191,6 +240,7 @@
       <div class="tabs" role="tablist">
         <button class="on" data-p="cc">Claude Code</button>
         <button data-p="desk">Claude Desktop</button>
+        <button data-p="outros">Codex · Gemini · Cursor · local models</button>
         <button data-p="web">claude.ai &amp; mobile (soon)</button>
       </div>
       <div class="pane on" id="p-cc">
@@ -207,6 +257,16 @@
           <li>Download <b>rubi.mcpb</b> from <a href="https://github.com/YURIBEDRAN/rubi/releases/latest">Releases</a>.</li>
           <li>Open it with Claude Desktop and choose a vault folder (an Obsidian vault works).</li>
           <li>In the app, Rubi provides the memory: knowledge graph, search and handoffs. The code map and automatic hooks need Claude Code.</li>
+        </ol>
+      </div>
+      <div class="pane" id="p-outros">
+        <ol><li><b>Clone Rubi</b>, then run the connector from inside your project:</li></ol>
+        <pre><span class="p">$ </span>git clone https://github.com/YURIBEDRAN/rubi
+<span class="p">$ </span>node rubi/scripts/conectar.mjs codex<button class="copy">Copy</button></pre>
+        <ol start="2">
+          <li>Swap <code>codex</code> for <b>gemini, cursor, vscode, windsurf, cline, opencode, continue, goose or zed</b>.</li>
+          <li>It registers the MCP server, writes the instructions file and, in Codex and Gemini CLI, turns on the automatic map and recall hooks.</li>
+          <li>Works with local models (Ollama, LM Studio) in Codex, Cline, OpenCode, Continue, Goose and Zed. Use models with tool calling, 8B+.</li>
         </ol>
       </div>
       <div class="pane" id="p-web">
@@ -359,6 +419,30 @@
   }
   $('play').addEventListener('click', play);
   $('reset').addEventListener('click', () => { playing = false; cancelAnimationFrame(raf); step = 0; logEl.innerHTML = ''; $('play').textContent = '▶ Play'; render(); });
+
+  // ---- calculadora /stats ----
+  const num = (t) => {
+    const m = String(t).trim().toLowerCase().replace(/,/g, '.').match(/^([\d.]+)\s*([kmbt]?)/);
+    if (!m) return NaN;
+    return parseFloat(m[1]) * ({ '': 1, k: 1e3, m: 1e6, b: 1e9, t: 1e12 })[m[2]];
+  };
+  const big = (n) => n >= 1e9 ? (n / 1e9).toFixed(n >= 1e11 ? 0 : 1) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(n >= 1e8 ? 0 : 1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(Math.round(n));
+  let ultimo = '';
+  function calc() {
+    const tot = num($('tot').value), cr = num($('cr').value);
+    const ok = tot > 0 && cr >= 0 && cr <= tot;
+    if (!ok) { ['c-pct', 'c-reread', 'c-saved', 'c-limit'].forEach((i) => ($(i).textContent = '–')); $('c-bar').style.width = '0'; return; }
+    const pct = cr / tot, poupado = tot * 0.2;
+    $('c-pct').textContent = (pct * 100).toFixed(1) + '%';
+    $('c-reread').textContent = big(cr);
+    $('c-saved').textContent = big(poupado);
+    $('c-limit').textContent = '+25%';
+    $('c-bar').style.width = (pct * 100).toFixed(1) + '%';
+    ultimo = `${(pct * 100).toFixed(1)}% of my ${big(tot)} Claude tokens were just Claude re-reading the conversation. Rubi would spare ~${big(poupado)} of them. Check yours: https://yuribedran.github.io/rubi/#calc`;
+  }
+  $('tot').addEventListener('input', calc); $('cr').addEventListener('input', calc);
+  $('c-copy').addEventListener('click', () => navigator.clipboard?.writeText(ultimo).then(() => { $('c-copy').textContent = 'Copied'; setTimeout(() => ($('c-copy').textContent = 'Copy my result'), 1400); }));
+  calc();
 
   // ---- tabs + copy ----
   document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {

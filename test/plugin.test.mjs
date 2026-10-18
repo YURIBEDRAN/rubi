@@ -224,6 +224,54 @@ test('MCP stdio: registrar e consultar pelo grafo, no projeto atual', async () =
   s.fechar();
 });
 
+test('MCP com outro cliente (Codex, Cursor...): descobre o projeto pelos roots e manda instruções sem hooks', async () => {
+  const p = spawn(process.execPath, [path.join(RAIZ, 'scripts', 'mcp-server.mjs')], { cwd: TMP, env: { ...env } });
+  const respostas = new Map();
+  let buf = '';
+  p.stdout.on('data', (d) => {
+    buf += d; let i;
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const m = JSON.parse(buf.slice(0, i)); buf = buf.slice(i + 1);
+      if (m.method === 'roots/list') p.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: m.id, result: { roots: [{ uri: pathToFileURL(PROJ).href, name: 'loja' }] } }) + '\n');
+      else respostas.set(m.id, m);
+    }
+  });
+  const enviar = (o) => p.stdin.write(JSON.stringify(o) + '\n');
+  const esperar = async (id) => { for (let t = 0; !respostas.has(id) && t < 100; t++) await new Promise((r) => setTimeout(r, 50)); return respostas.get(id); };
+  enviar({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: { roots: { listChanged: true } }, clientInfo: { name: 'codex-mcp-client' } } });
+  const ini = await esperar(1);
+  assert.match(ini.result.instructions, /At the start of a task, call rubi_mapa/);
+  enviar({ jsonrpc: '2.0', method: 'notifications/initialized' });
+  await new Promise((r) => setTimeout(r, 300));
+  enviar({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'rubi_registrar', arguments: { fatos: [{ tipo: 'decisao', titulo: 'Fila com Redis', texto: 'Redis porque o cliente já usa.' }] } } });
+  await esperar(2);
+  p.kill();
+  assert.ok(fs.existsSync(path.join(MEM, 'conhecimento', 'decisao-fila-com-redis.md')), 'gravou na pasta .rubi do projeto informado pelos roots');
+});
+
+test('conectar: configura Codex (TOML + hooks + AGENTS.md) e Cursor (JSON) sem duplicar', () => {
+  const home = path.join(TMP, 'home-agentes');
+  const codexHome = path.join(home, '.codex');
+  fs.mkdirSync(codexHome, { recursive: true });
+  fs.writeFileSync(path.join(codexHome, 'config.toml'), 'model = "gpt-5"\n');
+  const rodar = (...a) => spawnSync(process.execPath, [path.join(RAIZ, 'scripts', 'conectar.mjs'), ...a, '--projeto', PROJ], { env: { ...env, HOME: home, USERPROFILE: home, CODEX_HOME: codexHome }, encoding: 'utf8' });
+  assert.equal(rodar('codex').status, 0);
+  assert.equal(rodar('codex').status, 0, 'rodar de novo não pode quebrar');
+  const toml = fs.readFileSync(path.join(codexHome, 'config.toml'), 'utf8');
+  assert.match(toml, /^model = "gpt-5"/, 'mantém o que já existia');
+  assert.equal((toml.match(/\[mcp_servers\.rubi\]/g) || []).length, 1, 'não duplica o servidor');
+  const hooks = JSON.parse(fs.readFileSync(path.join(codexHome, 'hooks.json'), 'utf8')).hooks;
+  assert.equal(hooks.SessionStart.length, 1);
+  assert.match(hooks.UserPromptSubmit[0].hooks[0].command, /hook\.mjs" lembrar/);
+  const agents = fs.readFileSync(path.join(PROJ, 'AGENTS.md'), 'utf8');
+  assert.equal((agents.match(/rubi:inicio/g) || []).length, 1, 'bloco de instruções aparece uma vez só');
+  assert.ok(fs.existsSync(path.join(codexHome, 'config.toml.bak-rubi')), 'faz backup');
+  assert.equal(rodar('cursor').status, 0);
+  const cursor = JSON.parse(fs.readFileSync(path.join(home, '.cursor', 'mcp.json'), 'utf8'));
+  assert.equal(cursor.mcpServers.rubi.env.RUBI_PROJECT_DIR, '${workspaceFolder}');
+  assert.ok(fs.existsSync(path.join(PROJ, '.cursor', 'rules', 'rubi.mdc')));
+});
+
 test('MCP HTTP (app): exige token, guarda por projeto no vault e não expõe raio-x', async () => {
   const token = 'x'.repeat(32);
   const p = spawn(process.execPath, [path.join(RAIZ, 'scripts', 'mcp-server.mjs'), '--http', '--porta', '18787'], { env: { ...env, RUBI_TOKEN: token } });
