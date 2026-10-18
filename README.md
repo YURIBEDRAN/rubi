@@ -5,6 +5,7 @@
 <h3 align="center">A knowledge graph and context manager for AI coding agents.<br>Claude, Codex, Gemini, Cursor, Copilot and local models.<br>Shorter sessions, organized projects, fewer tokens.</h3>
 
 <p align="center">
+  <a href="https://huggingface.co/spaces/YuriBedran/rubi"><b>Check your usage</b></a> ·
   <a href="https://yuribedran.github.io/rubi/"><b>Live demo</b></a> ·
   <a href="#5-walkthrough-a-week-with-rubi">Walkthrough</a> ·
   <a href="#4-results">Results</a> ·
@@ -18,6 +19,8 @@
   <img alt="Codex" src="https://img.shields.io/badge/Codex-MCP%20%2B%20hooks-e0245e?style=flat-square">
   <img alt="Gemini CLI, Cursor, Copilot and more" src="https://img.shields.io/badge/Gemini%20%C2%B7%20Cursor%20%C2%B7%20Copilot%20%C2%B7%20more-MCP-e0245e?style=flat-square">
   <img alt="Local models" src="https://img.shields.io/badge/local%20models-Ollama%20%C2%B7%20LM%20Studio-3ccf91?style=flat-square">
+  <a href="https://huggingface.co/spaces/YuriBedran/rubi"><img alt="Hugging Face Space" src="https://img.shields.io/badge/%F0%9F%A4%97%20Space-calculator-ffcc4d?style=flat-square"></a>
+  <a href="https://huggingface.co/datasets/YuriBedran/rubi-benchmark"><img alt="Hugging Face Dataset" src="https://img.shields.io/badge/%F0%9F%A4%97%20Dataset-benchmark-ffcc4d?style=flat-square"></a>
   <img alt="Zero dependencies" src="https://img.shields.io/badge/dependencies-0-3ccf91?style=flat-square">
   <a href="https://github.com/YURIBEDRAN/rubi/actions/workflows/testes.yml"><img alt="Tests: Windows, macOS, Linux" src="https://github.com/YURIBEDRAN/rubi/actions/workflows/testes.yml/badge.svg"></a>
   <img alt="MIT" src="https://img.shields.io/badge/license-MIT-8b93a7?style=flat-square">
@@ -304,7 +307,7 @@ We separated the two things a memory system does, **reading** and **writing**, i
 - Metrics: the cost Claude Code itself reports (`total_cost_usd`), turns (API calls), tokens by type, and wall-clock time.
 - A pilot round was **discarded**: a quoting bug in the benchmark script meant the plugin never loaded in arm B. The script now refuses to record a Rubi arm if the plugin did not run.
 
-Reproduce with `node bench/rodar.mjs --reps 3 --bracos A,C,D`. Raw CSVs, summaries and every answer are in [`bench/resultados/`](bench/resultados/). The seed graph for arm D is in [`bench/sementes/`](bench/sementes/).
+Reproduce with `node bench/rodar.mjs --reps 3 --bracos A,C,D`. Raw CSVs, summaries and every answer are in [`bench/resultados/`](bench/resultados/) and on [Hugging Face](https://huggingface.co/datasets/YuriBedran/rubi-benchmark). The seed graph for arm D is in [`bench/sementes/`](bench/sementes/).
 
 #### Reading the memory (round 2)
 
