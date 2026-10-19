@@ -603,4 +603,4 @@ python docs/assets/build_svgs.py
 
 ---
 
-<p align="center"><sub>MIT · built with Claude Code · <a href="https://yuribedran.github.io/rubi/">yuribedran.github.io/rubi</a></sub></p>
+<p align="center"><sub>MIT · <a href="https://yuribedran.github.io/rubi/">yuribedran.github.io/rubi</a></sub></p>
