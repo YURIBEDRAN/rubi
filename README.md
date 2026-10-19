@@ -10,7 +10,7 @@
   <a href="#5-walkthrough-a-week-with-rubi">Walkthrough</a> ·
   <a href="#4-results">Results</a> ·
   <a href="#7-install"><b>Install &amp; test</b></a> ·
-  <a href="#2-background-the-ideas-in-plain-words">The theory</a>
+  <a href="#2-background">The theory</a>
 </p>
 
 <p align="center">
@@ -30,7 +30,7 @@
 
 ## Abstract
 
-AI coding assistants are billed for every token they read, and in a long conversation they re-read the whole history on every message. Analyzing **284 real Claude Code transcripts** (sessions and sub-agent runs), we found that **71% of the cost was spent re-reading context** and **97% came from sessions that grew past 150k tokens**. Claude was not doing more work. It was carrying more weight.
+AI coding assistants are billed for every token they read, and in a long conversation they re-read the whole history on every message. Analyzing **284 real Claude Code transcripts** (sessions and sub-agent runs), we found that **71% of the cost was spent re-reading context** and **97% came from sessions that grew past 150k tokens**.
 
 **Rubi** attacks the problem from two sides:
 
@@ -53,7 +53,7 @@ Everything is plain markdown inside the project (`.rubi/`), opens as an Obsidian
 ## Contents
 
 1. [The problem: why long sessions get expensive](#1-the-problem-why-long-sessions-get-expensive)
-2. [Background: the ideas, in plain words](#2-background-the-ideas-in-plain-words)
+2. [Background](#2-background)
 3. [Design: how Rubi works](#3-design-how-rubi-works)
 4. [Results](#4-results)
 5. [Walkthrough: a week with Rubi](#5-walkthrough-a-week-with-rubi)
@@ -69,8 +69,6 @@ Everything is plain markdown inside the project (`.rubi/`), opens as an Obsidian
 ### 1.1 Claude has no memory between messages
 
 A language model does not "remember" a conversation. Every time you send a message, the **entire conversation so far** is sent again: your requests, Claude's answers, and every file it read and every command it ran. That bundle is the **context**.
-
-> **In plain words.** Imagine a consultant who, before answering each new question, re-reads the whole meeting transcript from the start. Message 10 is cheap. Message 500 means re-reading 499 pages first.
 
 So the cost of a session is not proportional to the number of messages but to the **sum of the context sizes**. If the context grows by a roughly constant amount per message, that sum grows with the **square** of the session length.
 
@@ -98,9 +96,9 @@ Two conclusions drove the design:
 
 ---
 
-## 2. Background: the ideas, in plain words
+## 2. Background
 
-Rubi combines well-known techniques from information retrieval, graph theory and recent research on memory for language models. Each one below gets a plain-words explanation and a pointer to the original work.
+Rubi combines well-known techniques from information retrieval, graph theory and recent research on memory for language models. Each is summarized below with a reference to the original work.
 
 ### 2.1 What a knowledge graph does that notes don't
 
@@ -110,9 +108,9 @@ Rubi combines well-known techniques from information retrieval, graph theory and
 
 A **graph** is just *things* (nodes) connected by *relationships* (edges). In Rubi the nodes are files, modules, decisions, bugs, gotchas and concepts, and the edges are "file A imports file B", "this decision is about login.ts", "this bug is related to Checkout", "this decision replaces that one".
 
-> **In plain words.** A folder of notes is like a pile of index cards: you only find a card if you guess the word written on it. A graph is like a **city map**: from where you are, you can see what's next door. Ask about *"finishing a purchase"* and a plain search finds nothing, because no note says "purchase". With Rubi, Claude adds the related word *checkout* to the search (section 2.9), the graph finds the concept **Checkout**, sees that it is **linked** to a gotcha called *"Coupon applied twice"* and to the file `cupom.ts`, and brings those along. You get the trap you were about to fall into, even though you never typed its name.
+Example: a question about *"finishing a purchase"* finds nothing by text search, because no note contains the word "purchase". With Rubi, Claude adds the related term *checkout* to the query (section 2.9), the text match reaches the concept **Checkout**, and the graph follows its edges to a gotcha, *"Coupon applied twice"*, and to the file `cupom.ts`. The relevant trap is retrieved although the question never named it.
 
-That is the difference: **search finds what matches your words; a graph also finds what is connected to them.** In code, connections are everything: who imports whom, which decision affects which file, which bug came back where.
+Text search finds what matches the words of a query; a graph also finds what is connected to them. In a codebase the connections carry most of the information: which file imports which, which decision affects which file, where a bug reappeared.
 
 ### 2.2 Ranking by text: BM25
 
@@ -124,23 +122,21 @@ When you search, something has to decide which results come first. **BM25** (Rob
 
 ### 2.4 Spreading from what matched: Personalized PageRank
 
-**Personalized PageRank** (Haveliwala, 2002) is PageRank that "starts" from a few chosen nodes and spreads outward, so you get what is important **relative to your question**. **HippoRAG** (Gutiérrez et al., 2024) showed this works remarkably well as long-term memory for language models, inspired by how the hippocampus links memories. Rubi seeds it with the nodes that matched your words and lets relevance flow through the graph, discounting "hub" files that everything touches.
+**Personalized PageRank** (Haveliwala, 2002) is PageRank that "starts" from a few chosen nodes and spreads outward, so you get what is important **relative to your question**. **HippoRAG** (Gutiérrez et al., 2024) showed that this works well as long-term memory for language models. Rubi seeds it with the nodes that matched your words and lets relevance flow through the graph, discounting "hub" files that everything touches.
 
 ### 2.5 Combining rankings: Reciprocal Rank Fusion
 
-Text, exact file and function names, and graph proximity each produce their own ranked list. **Reciprocal Rank Fusion** (Cormack et al., 2009) merges them with a simple rule: each list gives every item `1 / (60 + position)`, and the scores are added. It is robust, needs no tuning, and is what ai-memory also uses.
+Text, exact file and function names, and graph proximity each produce their own ranked list. **Reciprocal Rank Fusion** (Cormack et al., 2009) merges them with a simple rule: each list gives every item `1 / (60 + position)`, and the scores are added. It uses only ranks, so the lists need no score calibration. ai-memory uses the same method.
 
 ### 2.6 Zoom levels: hierarchical summaries
 
-Microsoft's **GraphRAG** (Edge et al., 2024) showed the value of summarizing a knowledge graph at several levels. Rubi keeps three:
+**GraphRAG** (Edge et al., 2024) showed the value of summarizing a knowledge graph at several levels. Rubi keeps three:
 
 | Level | File | Size | When it's read |
 |---|---|---|---|
 | 0 | `mapa.md` | ~500 tokens | at the start of every session |
 | 1 | `modulos/<module>.md` | a page per module | on demand, with `rubi_mapa(module)` |
 | 2 | `conhecimento/*.md` | one file per node | found by search |
-
-> **In plain words.** Instead of handing someone the whole encyclopedia, you hand them the table of contents and let them open the chapter they need.
 
 ### 2.7 Facts that change: a temporal graph
 
@@ -247,7 +243,7 @@ sequenceDiagram
 | `SessionStart` | Indexes the code (incremental, in the background after the first run) and injects the level-0 map. After a compaction or `/clear`, injects the handoff. |
 | `UserPromptSubmit` | **Recall.** Searches the graph with your request and injects the relevant knowledge (≤700 tokens, only when something actually matches). Also runs the meter. |
 | `PostToolUse` | **Meter.** Reads the real context size and, at 80% of the window, asks Claude to register facts, write missing summaries and save a handoff. |
-| `Stop` | **Harvest.** If the answer involved heavy exploration (≥10 reads/searches) and nothing was saved, asks Claude to register 1–5 durable facts before finishing. |
+| `Stop` | **Harvest.** If the answer involved heavy exploration (≥10 reads/searches) and nothing was saved, asks Claude to register 1 to 5 durable facts before finishing. |
 | `PreCompact` | Saves an objective record of what is about to be compacted (requests, files changed, commands) and links it to the files. |
 | `PreToolUse` | **Read guard.** Blocks reading a huge file in full once and points to Grep or `offset/limit`. |
 | `rubi_contexto` | Hybrid search within a token budget. |
@@ -280,7 +276,7 @@ We ran two studies: a retrospective analysis of real usage, and a controlled A/B
 
 ### 4.1 Study 1: early compaction on real sessions
 
-**Method.** The X-ray reads every Claude Code transcript from the last 30 days (284 transcripts: main sessions and sub-agent runs) and replays each one's actual context curve under a policy that compacts whenever the context passes a threshold and resumes from the fixed context plus an 8k-token handoff. The cost of each compaction (rewriting the new cache prefix) is charged. Costs are in input-token equivalents using Anthropic's price ratios (cache read 0.1×, cache write 1.25–2×, output 5×).
+**Method.** The X-ray reads every Claude Code transcript from the last 30 days (284 transcripts: main sessions and sub-agent runs) and replays each one's actual context curve under a policy that compacts whenever the context passes a threshold and resumes from the fixed context plus an 8k-token handoff. The cost of each compaction (rewriting the new cache prefix) is charged. Costs are in input-token equivalents using Anthropic's price ratios (cache read 0.1×, cache write 1.25× or 2×, output 5×).
 
 | Compaction threshold | Window switches | Estimated saving on total cost |
 |---|---|---|
@@ -301,7 +297,7 @@ We separated the two things a memory system does, **reading** and **writing**, i
 | **A** | Claude Code, no plugin | baseline |
 | **B** | Rubi complete, harvesting after every answer that explored ≥4 files | what does *writing* the memory cost? |
 | **C** | Rubi, map + automatic recall, no harvest, empty graph | what does *reading* cost or save with no knowledge yet? |
-| **D** | Same as C, but starting with a graph of 5–6 nodes written by Claude in arm B | what does a *mature* project memory save? |
+| **D** | Same as C, but starting with a graph of 5 or 6 nodes written by Claude in arm B | what does a *mature* project memory save? |
 
 - Model `claude-sonnet-5`, read-only tools, **3 repetitions per arm**, fresh clone per repetition, **90 sessions** in total (round 1: A vs B; round 2: A vs C vs D, re-running A so both rounds have their own baseline).
 - Metrics: the cost Claude Code itself reports (`total_cost_usd`), turns (API calls), tokens by type, and wall-clock time.
@@ -313,7 +309,7 @@ Reproduce with `node bench/rodar.mjs --reps 3 --bracos A,C,D`. Raw CSVs, summari
 
 | | **A** no Rubi | **C** map + recall | **D** mature graph |
 |---|---|---|---|
-| Turns (3 sessions, mean) | 34.0 | 26.7 **(−21%)** | 21.3 **(−37%)** |
+| Turns (per repetition, Flask + Hono, 6 sessions) | 34.0 | 26.7 **(−21%)** | 21.3 **(−37%)** |
 | Cache reads (tokens) | 919k | 771k (−16%) | 579k **(−37%)** |
 | Output tokens | 8.5k | 6.8k (−20%) | 6.3k (−26%) |
 | Cache writes (tokens) | 131k | 141k (+7%) | 141k (+8%) |
@@ -332,15 +328,29 @@ Reproduce with `node bench/rodar.mjs --reps 3 --bracos A,C,D`. Raw CSVs, summari
 
 | | **A** no Rubi | **B** harvest after every exploring answer |
 |---|---|---|
-| Billed cost (3 sessions, mean) | $0.800 | $0.922 **(+15%)** |
+| Billed cost (per repetition, Flask + Hono, 6 sessions) | $0.800 | $0.922 **(+15%)** |
 | Turns | 33.0 | 32.3 |
-| Nodes in the graph at the end | — | 2 to 5 |
+| Nodes in the graph at the end | 0 | 2 to 5 |
+
+#### Paired analysis
+
+The tables above are ratios of means. Pairing each arm with the baseline by repository and repetition (n = 6 pairs, two-sided t test, 5 degrees of freedom) gives the mean relative change with a 95% confidence interval:
+
+| Comparison | Metric | Change | 95% CI | p | p, Holm-adjusted over 6 metrics |
+|---|---|---|---|---|---|
+| D vs A | Turns | −34.7% | −56.3% to −13.1% | 0.009 | 0.055 |
+| D vs A | Cache reads | −32.2% | −56.8% to −7.6% | 0.020 | 0.10 |
+| D vs A | Billed cost | −4.5% | −19.9% to +11.0% | 0.49 | 0.49 |
+| B vs A | Billed cost | +15.1% | +7.5% to +22.7% | 0.004 | 0.015 |
+| B vs A | Wall-clock time | +22.9% | +15.6% to +30.1% | 0.0005 | 0.003 |
+
+The reductions from reading a mature graph are significant individually but do not survive the correction for six metrics, so they are suggestive rather than conclusive. The extra cost of writing after every exploring answer survives it.
 
 ### 4.3 Discussion
 
 **Reading a project memory makes Claude much more direct.** With a mature graph, Claude needed **37% fewer steps**, re-read **37% less context** and finished **17% faster**. It went straight to the files the memory pointed at instead of searching around. Even with an empty graph, the map and the recall alone cut 21% of the steps.
 
-**In this benchmark that only became a 6% lower bill, and here is why.** Every question ran in a brand-new, cold session: a single question, then the session ends. In that setting the most expensive part is writing the cache from scratch (cache writes cost 2× the input price), and that part is the same with or without Rubi. The savings land on cache reads and output, which are a small share of a 3-to-5-turn session.
+**In this benchmark that became only a 6% lower bill.** Every question ran in a brand-new, cold session: a single question, then the session ends. In that setting the most expensive part is writing the cache from scratch (cache writes cost 2× the input price), and that part is the same with or without Rubi. The savings land on cache reads and output, which are a small share of a 3-to-5-turn session.
 
 **Real work looks the other way around.** In the 284 real transcripts of Study 1, cache **reads were 71% of the cost**, writes ~20% and output ~10%. Applying arm D's measured changes to that real mix (reads −37%, writes +8%, output −26%) gives:
 
@@ -350,11 +360,11 @@ Reproduce with `node bench/rodar.mjs --reps 3 --bracos A,C,D`. Raw CSVs, summari
 
 That is a **projection**, not a measurement. Measuring it properly needs long, multi-task sessions on a real project; that is the next benchmark.
 
-**Answer quality.** A spot check found the answers equivalent, with one telling difference. On the Flask teardown question, the baseline answer cited `RequestContext.pop`, a class that no longer exists in current Flask (it was merged into `AppContext`), most likely recalled from training data. The answer with a mature graph got it right, because the graph held the fact *"AppContext and RequestContext were unified"*, written by Claude after reading the actual code. A memory of **this** codebase beats the model's memory of **old versions** of it. That is one observation, not a measured rate.
+**Answer quality.** A spot check found the answers equivalent, with one notable difference. On the Flask teardown question, the baseline answer cited `RequestContext.pop`, a class that no longer exists in current Flask (it was merged into `AppContext`), most likely recalled from training data. The answer with a mature graph got it right, because the graph held the fact *"AppContext and RequestContext were unified"*, written by Claude after reading the actual code. A memory of this codebase was more reliable than the model's knowledge of older versions of it. This is a single observation, not a measured rate.
 
 **Writing on every answer does not pay in short sessions.** Arm B's harvest (an extra tool load plus an extra call that re-reads the context) cost 15% more, and three short sessions are not enough to earn it back. Following this result, **Rubi's default changed**: the harvest now only triggers after heavy exploration (≥10 reads/searches with nothing saved), and the main extraction happens at the meter (80% of the window), when the context is already large and paid for.
 
-**Where the money is today.** Of everything measured, the largest lever is still **keeping sessions short** (Study 1: about 37% of total cost, simulated on real usage). The knowledge graph's measured contribution is **fewer steps and less re-reading**, which compounds in long sessions and on codebases the model has never seen. Flask and Hono are famous projects the model partly knows from training, the least favorable case for a memory.
+**Where the largest saving is.** Of everything measured, the largest lever is still **keeping sessions short** (Study 1: about 37% of total cost, simulated on real usage). The knowledge graph's measured contribution is **fewer steps and less re-reading**, which compounds in long sessions and on codebases the model has never seen. Flask and Hono are famous projects the model partly knows from training, the least favorable case for a memory.
 
 ---
 
@@ -395,7 +405,7 @@ rubi_registrar → criado: conhecimento/bug-cupom-aplicado-duas-vezes.md
 
 **Thursday, a decision changes.** *"Let's use JWT instead of session cookies."* Claude registers the new decision with `substitui: "Sessão em cookie"`. The old one is marked superseded, never deleted, and no future session will follow it.
 
-**Friday, look at it.** Open `.rubi/` in Obsidian and switch to graph view: modules, decisions, bugs and concepts, connected. Run `/rubi:raio-x` to see where the week's tokens went, and `/rubi:organizar` if your `CLAUDE.md` has grown fat. It moves the details into the graph and leaves only the rules that matter in every message.
+**Friday, look at it.** Open `.rubi/` in Obsidian and switch to graph view: modules, decisions, bugs and concepts, connected. Run `/rubi:raio-x` to see where the week's tokens went, and `/rubi:organizar` if your `CLAUDE.md` has grown too large. It moves the details into the graph and leaves only the rules that matter in every message.
 
 ---
 
@@ -490,12 +500,12 @@ For each agent it registers the MCP server in that agent's config (keeping a `.b
 | Agent | Memory tools (MCP) | Map + recall automatically | Instructions file | Local models | Tested end to end |
 |---|---|---|---|---|---|
 | **Claude Code** | yes (plugin) | yes, plus meter, harvest, early compaction, read guard | `CLAUDE.md` | yes (Ollama, LM Studio) | **yes** |
-| **Claude Desktop** | yes (`rubi.mcpb`) | no hooks in the app | – | – | **yes** |
+| **Claude Desktop** | yes (`rubi.mcpb`) | no hooks in the app | none | no | **yes** |
 | **OpenAI Codex** | yes | yes (hooks) | `AGENTS.md` | yes (`codex --oss`, Ollama, LM Studio) | **yes** (MCP and hooks) |
-| **Gemini CLI** | yes | yes (hooks) | `GEMINI.md` | – | configured from docs |
-| **Cursor** | yes | via instructions | `.cursor/rules/rubi.mdc` | – | configured from docs |
+| **Gemini CLI** | yes | yes (hooks) | `GEMINI.md` | no | configured from docs |
+| **Cursor** | yes | via instructions | `.cursor/rules/rubi.mdc` | no | configured from docs |
 | **GitHub Copilot (VS Code)** | yes, per project | via instructions | `AGENTS.md` | yes (bring your own key) | configured from docs |
-| **Windsurf** | yes | via instructions | `AGENTS.md` | – | configured from docs |
+| **Windsurf** | yes | via instructions | `AGENTS.md` | no | configured from docs |
 | **Cline** | yes | via instructions | `AGENTS.md` | yes | configured from docs |
 | **OpenCode** | yes | via instructions | `AGENTS.md` | yes | configured from docs |
 | **Continue** | yes, per project (agent mode) | via instructions | `.continue/rules/rubi.md` | yes | snippet to paste |
@@ -564,7 +574,7 @@ Support for the website and the mobile app is in development. The pieces already
 <summary><b>Development</b></summary>
 
 ```bash
-npm test                     # 12 tests: code map, graph, search, map, hooks, MCP stdio + HTTP
+npm test                     # 14 tests: code map, graph, search, map, hooks, MCP stdio + HTTP
 node bench/rodar.mjs         # A/B benchmark
 npm run empacotar            # dist/rubi.mcpb + dist/rubi.zip
 python docs/assets/build_svgs.py
@@ -581,7 +591,7 @@ python docs/assets/build_svgs.py
 
 </details>
 
-> **Why some names are in Portuguese.** Rubi was born in Brazil, and tool names, folders and the messages it sends to Claude are in Portuguese. Claude understands them either way. The name comes from **Rubi**nger, and from the idea of keeping only what's precious.
+> **Note on naming.** Tool names, folders and the messages sent to the model are in Portuguese. Models handle them the same way as English names.
 
 ---
 
