@@ -30,7 +30,7 @@
 
 ## Abstract
 
-AI coding assistants are billed for every token they read, and in a long conversation they re-read the whole history on every message. Analyzing **284 real Claude Code sessions**, we found that **71% of the cost was spent re-reading context** and **97% came from sessions that grew past 150k tokens**. Claude was not doing more work. It was carrying more weight.
+AI coding assistants are billed for every token they read, and in a long conversation they re-read the whole history on every message. Analyzing **284 real Claude Code transcripts** (sessions and sub-agent runs), we found that **71% of the cost was spent re-reading context** and **97% came from sessions that grew past 150k tokens**. Claude was not doing more work. It was carrying more weight.
 
 **Rubi** attacks the problem from two sides:
 
@@ -43,7 +43,7 @@ Everything is plain markdown inside the project (`.rubi/`), opens as an Obsidian
 
 | Study | Result |
 |---|---|
-| Early compaction, replayed on 284 real sessions | **≈37% lower total cost** (simulation on real context curves) |
+| Early compaction, replayed on 284 real transcripts | **≈37% lower total cost** (simulation on real context curves) |
 | A/B benchmark, 90 sessions, reading a mature graph | **−37% steps, −37% context re-read, −17% time**; billed cost **−6%** in short cold-start sessions |
 | Same, projected onto the real cost mix (71% cache reads) | **≈26% lower cost** (projection, not yet measured) |
 | A/B benchmark, writing memory after every answer | **+15% cost** in short sessions, so the default was changed to write less often |
@@ -82,11 +82,11 @@ Anthropic's **prompt caching** stores the beginning of the context so that re-re
 
 Rubi ships a **token X-ray** that reads Claude Code's local transcripts. On 30 days of real usage:
 
-| Finding (284 sessions, 30 days) | |
+| Finding (284 transcripts, 30 days) | |
 |---|---|
 | Share of cost that was **re-reading context** (cache reads) | **71%** |
 | Share of cost from sessions that grew past **150k tokens** | **97%** |
-| Sessions that reached **~1 million** tokens | **68** |
+| Transcripts that peaked above **400k** tokens (the largest reached ~970k) | **68** |
 | Context loaded **before the first message** (median) | **48k** |
 | Tool whose outputs weighed most in the context | Bash (15%), then Read (4%) |
 | Times the cache expired mid-session and was rewritten | 197 |
@@ -280,7 +280,7 @@ We ran two studies: a retrospective analysis of real usage, and a controlled A/B
 
 ### 4.1 Study 1: early compaction on real sessions
 
-**Method.** The X-ray reads every Claude Code transcript from the last 30 days (284 sessions) and replays each session's actual context curve under a policy that compacts whenever the context passes a threshold and resumes from the fixed context plus an 8k-token handoff. The cost of each compaction (rewriting the new cache prefix) is charged. Costs are in input-token equivalents using Anthropic's price ratios (cache read 0.1×, cache write 1.25–2×, output 5×).
+**Method.** The X-ray reads every Claude Code transcript from the last 30 days (284 transcripts: main sessions and sub-agent runs) and replays each one's actual context curve under a policy that compacts whenever the context passes a threshold and resumes from the fixed context plus an 8k-token handoff. The cost of each compaction (rewriting the new cache prefix) is charged. Costs are in input-token equivalents using Anthropic's price ratios (cache read 0.1×, cache write 1.25–2×, output 5×).
 
 | Compaction threshold | Window switches | Estimated saving on total cost |
 |---|---|---|
@@ -342,7 +342,7 @@ Reproduce with `node bench/rodar.mjs --reps 3 --bracos A,C,D`. Raw CSVs, summari
 
 **In this benchmark that only became a 6% lower bill, and here is why.** Every question ran in a brand-new, cold session: a single question, then the session ends. In that setting the most expensive part is writing the cache from scratch (cache writes cost 2× the input price), and that part is the same with or without Rubi. The savings land on cache reads and output, which are a small share of a 3-to-5-turn session.
 
-**Real work looks the other way around.** In the 284 real sessions of Study 1, cache **reads were 71% of the cost**, writes ~20% and output ~10%. Applying arm D's measured changes to that real mix (reads −37%, writes +8%, output −26%) gives:
+**Real work looks the other way around.** In the 284 real transcripts of Study 1, cache **reads were 71% of the cost**, writes ~20% and output ~10%. Applying arm D's measured changes to that real mix (reads −37%, writes +8%, output −26%) gives:
 
 ```text
 0.71 × 0.63  +  0.20 × 1.08  +  0.10 × 0.74  =  0.737   →  ≈ 26% lower cost
