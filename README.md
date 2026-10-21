@@ -152,7 +152,7 @@ Most memory systems call **another** model to extract facts and compute embeddin
 
 - **Extraction happens when knowledge is already paid for.** At handoff time, or at the end of an answer that required exploring the code, Claude has everything in context. Writing down 3 facts costs a few hundred output tokens. Asking another model later would mean re-reading everything.
 - **Semantic search is done by Claude, not by vectors.** When Claude queries Rubi it sends `termos`: synonyms, related concepts and likely function names it imagines. That is the *query expansion* idea behind HyDE (Gao et al., 2022) and Query2doc (Wang et al., 2023). The LLM supplies the meaning; BM25 and the graph supply the speed.
-- **Heavy research runs in a separate window.** The bundled `rubi-pesquisador` subagent explores in its own context and returns only the conclusion, so the main session stays light.
+- **Heavy research runs in a separate window.** The bundled `rubi-pesquisador` subagent explores in its own context and returns only the conclusion, so the main session stays light. It runs on Haiku, the smallest Claude model, because its job is reading and summarizing.
 
 | Work | Who does it | Token cost |
 |---|---|---|
@@ -161,7 +161,7 @@ Most memory systems call **another** model to extract facts and compute embeddin
 | Extract decisions, bugs, gotchas, concepts | Claude, at handoff or at the end of an exploration | a few hundred output tokens |
 | Recall what matters for each new request | Rubi hook (BM25 + graph over your prompt) | none to compute; ≤700 tokens injected, only when something matches |
 | Understand the question (synonyms, related terms) | Claude, when calling the search | dozens of tokens |
-| Deep exploration of the code | `rubi-pesquisador` subagent | isolated from the main context |
+| Deep exploration of the code | `rubi-pesquisador` subagent, on Haiku | isolated from the main context, at small-model prices |
 
 ---
 
@@ -552,7 +552,7 @@ Support for the website and the mobile app is in development. The pieces already
 - `/rubi:handoff`: register facts and save a handoff now.
 - `/rubi:organizar`: slim down a large `CLAUDE.md` into the graph and the map.
 - `/rubi:raio-x`: where your tokens go, and what to change first.
-- Agent `rubi-pesquisador`: researches the codebase in its own context window and returns only the conclusion.
+- Agent `rubi-pesquisador`: researches the codebase in its own context window, on Haiku, and returns only the conclusion.
 - CLI: `node scripts/indexar.mjs`, `node scripts/raio-x.mjs --dias 30`, `node scripts/auditar.mjs <dir>`.
 
 </details>
