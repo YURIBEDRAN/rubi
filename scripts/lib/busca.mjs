@@ -11,6 +11,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { listarMd, separarFrontmatter, idDe } from './memoria.mjs';
 import { lerNos, ROTULO } from './grafo.mjs';
+import { lerConfig } from './config.mjs';
+
+// Grafo automático: o que entra sem gastar token (comentário do topo dos arquivos, resumo automático dos
+// módulos, arquivos que mudam juntos no git). Dá pra desligar com grafoAutomatico: false, pra comparar.
+const automatico = () => lerConfig().grafoAutomatico !== false;
 
 const PARADAS = new Set(('a o e de da do das dos em no na nos nas um uma uns umas que com por para pra pro os as se ao aos como mais mas ou ja nao sim isso esse essa este esta ele ela eles elas seu sua ser ter foi sao tem esta estao the of and to in is it for on with as by be this that are or an at from was were not but how what why when where which who does do did can could should would will use using').split(' '));
 
@@ -51,9 +56,11 @@ function documentos({ m, mp, codigo, raiz }) {
   for (const p of listarMd(path.join(m, 'modulos'))) {
     const { campos, corpo } = separarFrontmatter(fs.readFileSync(p, 'utf8'));
     const nome = campos.modulo || path.basename(p, '.md');
-    // só o resumo escrito pelo Claude conta como texto; as listas de ligação viram ruído
+    // só o resumo conta como texto (as listas de ligação viram ruído): o escrito pelo Claude e, na falta dele,
+    // o automático, montado sem IA a partir do README e dos comentários do topo dos arquivos
     const resumo = (corpo.match(/<!-- rubi:resumo -->([\s\S]*?)<!-- \/rubi:resumo -->/)?.[1] || '').replace(/^_.*_$/m, '').trim();
-    add({ chave: `mod:${nome}`, tipo: 'modulo', titulo: `módulo ${nome}`, texto: resumo, resumo, peso: resumo ? 0.8 : 0.5, caminho: `modulos/${path.basename(p)}` });
+    const auto = !automatico() ? '' : (corpo.match(/<!-- rubi:auto -->([\s\S]*?)<!-- \/rubi:auto -->/)?.[1] || '').trim();
+    add({ chave: `mod:${nome}`, tipo: 'modulo', titulo: `módulo ${nome}`, texto: resumo || auto, resumo: resumo || auto, peso: resumo ? 0.8 : auto ? 0.65 : 0.5, caminho: `modulos/${path.basename(p)}` });
   }
   const recentes = (sub, n) => listarMd(path.join(m, sub)).slice(-n);
   for (const [sub, n, peso, tipo] of [['handoffs', 8, 0.7, 'handoff'], ['sessoes', 15, 0.4, 'sessao']]) {
@@ -64,7 +71,7 @@ function documentos({ m, mp, codigo, raiz }) {
   }
   for (const [f, a] of Object.entries(codigo?.arquivos || {})) {
     const teste = /(^|\/)(tests?|spec|__tests__)\/|\.(test|spec)\.[^/]+$|_test\.\w+$/.test(f);
-    add({ chave: `arq:${f}`, tipo: 'arquivo', titulo: f.replace(/[/._-]/g, ' '), texto: a.simbolos.join(' '), peso: teste ? 0.3 : 0.55, arquivo: f, info: a });
+    add({ chave: `arq:${f}`, tipo: 'arquivo', titulo: f.replace(/[/._-]/g, ' '), texto: automatico() ? `${a.simbolos.join(' ')} ${a.doc || ''}` : a.simbolos.join(' '), peso: teste ? 0.3 : 0.55, arquivo: f, info: a });
   }
   return docs;
 }
@@ -115,6 +122,14 @@ function montarGrafo(docs, codigo) {
   }
   for (const [f, a] of Object.entries(codigo?.arquivos || {})) {
     for (const i of a.imports || []) liga(`arq:${f}`, `arq:${i}`, 0.6);
+  }
+  // arquivos que mudam juntos no git (peso pela confiança do par)
+  if (automatico()) for (const [a, b, c] of codigo?.historico?.pares || []) liga(`arq:${a}`, `arq:${b}`, 0.5 * c);
+  // módulo como ponte pros seus arquivos mais centrais: o resumo bate no texto, o grafo leva aos arquivos
+  const chaves = new Set(docs.map((d) => d.chave));
+  if (automatico()) for (const [nome, info] of Object.entries(codigo?.modulos || {})) {
+    if (!chaves.has(`mod:${nome}`)) continue;
+    for (const f of info.arquivos.slice(0, 5)) liga(`mod:${nome}`, `arq:${f}`, 0.3);
   }
   return viz;
 }

@@ -1,0 +1,5 @@
+# flask C rep 3 pergunta 1
+
+> Como o Flask torna o objeto global 'request' disponível durante uma requisição e o que acontece no fim dela? Cite arquivos e funções principais. Responda em até 10 linhas.
+
+O `request` em `flask.globals` é um `werkzeug.local.LocalProxy` ligado à `ContextVar` `_cv_app` (acessando o atributo `"request"` do contexto atual) — `src/flask/globals.py:57`. Quando chega uma requisição, `Flask.wsgi_app` cria um `AppContext`/`RequestContext` (via `app.request_context`) e chama `push()` em `src/flask/ctx.py:416`, que faz `_cv_app.set(self)`, guardando esse contexto (com `_request` preenchido) na ContextVar — a partir daí o proxy `request` resolve para esse objeto em qualquer código daquela thread/task. No fim, `wsgi_app` chama `pop()` (`ctx.py:446`), que roda `do_teardown_request`/`do_teardown_appcontext`, fecha a sessão (`self._request.close()`) e por fim `_cv_app.reset(self._cv_token)`, removendo o contexto e tornando `request` inacessível de novo (erro "working outside of request context").

@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "rubi",
   "display_name": "Rubi",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Persistent markdown memory for Claude Desktop: save where you left off and continue in a fresh chat without losing the thread.",
   "long_description": "Keeps notes and handoffs in a markdown vault (opens in Obsidian). When a chat gets long, Claude saves a handoff and you continue in a new chat, spending far less of your usage limit.",
   "author": {

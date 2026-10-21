@@ -39,7 +39,7 @@ AI coding assistants are billed for every token they read, and in a long convers
 
 Everything is plain markdown inside the project (`.rubi/`), opens as an Obsidian graph, and runs locally with zero dependencies. It was built for Claude Code and, because its core is a standard MCP server, it also runs in **Codex, Gemini CLI, Cursor, GitHub Copilot, Windsurf, Cline, OpenCode, Continue, Goose and Zed**, with hosted or **local models** ([see the table](#codex-gemini-cli-cursor-copilot-and-other-agents)).
 
-**Results.** Three studies, reported as measured, including what did not work:
+**Results.** Four studies, reported as measured, including what did not work:
 
 | Study | Result |
 |---|---|
@@ -48,6 +48,7 @@ Everything is plain markdown inside the project (`.rubi/`), opens as an Obsidian
 | Same, projected onto the real cost mix (71% cache reads) | **≈26% lower cost** (projection, not yet measured) |
 | A/B benchmark, writing memory after every answer | **+15% cost** in short sessions, so the default was changed to write less often |
 | Five more ideas, measured on top of early compaction | the fixed context is **13% of the cost** and is now diagnosed by the X-ray; shortening outputs and restarting after pauses add at most 1.5 points, so they stay off ([4.4](#44-study-3-other-savings-measured-before-building)) |
+| Automatic graph built without any model (git co-change, file comments), 36 sessions | **−19% turns**, **−9.6% cost** against an empty memory, at zero tokens to build ([4.5](#45-study-4-savings-that-cost-no-tokens-84-sessions)) |
 
 ---
 
@@ -383,6 +384,37 @@ The bundled `rubi-pesquisador` subagent now runs on Haiku: its job is to read an
 
 Reproduce: `node bench/saidas.mjs --reps 3` (output shortening A/B; the pilot is in [`bench/resultados/saidas-piloto.md`](bench/resultados/saidas-piloto.md)) and `/rubi:raio-x` (fixed context).
 
+### 4.5 Study 4: savings that cost no tokens (84 sessions)
+
+A saving only counts if it is net: memory that takes tokens to build has to earn them back in later sessions. So this round tested improvements that are built **by computation alone**, with no model calls, and re-tested the two ideas of 4.4 under better controls. External MCP servers were turned off in every run, because they connect at different times and add random noise to the context. Answers were checked automatically against ground truth where the task allowed it.
+
+**Automatic graph** (`bench/rodar.mjs --bracos C,E --profundidade 400`, 36 sessions; the same three chained questions on Flask and Hono as Study 2, empty memory in both arms). Arm E adds three things built without a model:
+
+- the comment or docstring at the top of each file, in the text index;
+- an automatic summary for each module, from the folder's README and the top comments of its central files (search and module pages only; the session map does not grow);
+- **files that change together in git** as graph edges (logical coupling, Gall et al., 1998; Zimmermann et al., 2004: commits touching both files, divided by the commits of the less frequently changed one plus one; commits touching more than 25 files are ignored), plus edges from each module to its five most central files.
+
+| E vs C, paired by repository and repetition (n = 6) | Mean change | 95% CI |
+|---|---|---|
+| Turns | **−19.0%** | −36.9% to −1.1% |
+| Billed cost | **−9.6%** | −19.3% to +0.1% |
+| Cache reads | −18.7% | −48.7% to +11.3% |
+
+Answer quality, checked by the key files each answer should cite: 18/18 without, 17/18 with (the one miss was a correct answer that did not mention Hono's existing timing middleware). Building the automatic graph took under 0.7 s on Hono with 400 commits of history. **On by default** (`grafoAutomatico`).
+
+**Shortening large outputs, long sessions** (`bench/economia.mjs`, 24 sessions: one session doing four tasks in a row on Hono, so the outputs stay in context and are re-read). The cut was crossed with a trimmed fixed context in a 2×2 design, 6 repetitions per cell. All 96 answers were correct in all four arms.
+
+| Factor (12 paired comparisons each) | Billed cost | 95% CI | p |
+|---|---|---|---|
+| Shortening outputs | −9.9% | −22.8% to +3.0% | 0.12 |
+| Trimmed fixed context (4 unused tools denied, −4.9k tokens per call) | +13.7% | −6.6% to +34.0% | 0.17 |
+
+**Shortening large outputs, short sessions** (`bench/saidas.mjs`, 24 sessions, 4 tasks × 3 repetitions): −1.8% (95% CI −9.4% to +5.8%), 12/12 correct in both arms.
+
+**Reading the results.** Shortening outputs did not hurt answers in the 60 tasks run with it on (including the ones where the answer sat in the middle of the output) and trends cheaper in long sessions, but the effect is not significant, and on real usage with early compaction the expected gain is under 1% (4.4). It stays **available but off**. The trimmed context removed exactly 4.9k tokens from every call with no loss of correctness; its cost difference is not significant in either direction, because the number of turns the agent chooses (6 to 10 for the same task) varies far more than the saving. Its effect is better computed than sampled: tokens removed × calls × read price. That is what the X-ray and the new `scripts/enxugar.mjs` report per project; on the author's projects it comes to about 1% of cost, up to 3% where `Artifact` is never used.
+
+Statistics: [`bench/estatistica.mjs`](bench/estatistica.mjs), output in [`bench/resultados/estatistica-economia-1-saidas-1.md`](bench/resultados/estatistica-economia-1-saidas-1.md).
+
 ---
 
 ## 5. Walkthrough: a week with Rubi
@@ -570,7 +602,7 @@ Support for the website and the mobile app is in development. The pieces already
 - `/rubi:organizar`: slim down a large `CLAUDE.md` into the graph and the map.
 - `/rubi:raio-x`: where your tokens go, what fills the fixed context and how often each part is used, and what to change first.
 - Agent `rubi-pesquisador`: researches the codebase in its own context window, on Haiku, and returns only the conclusion.
-- CLI: `node scripts/indexar.mjs`, `node scripts/raio-x.mjs --dias 30`, `node scripts/auditar.mjs <dir>`.
+- CLI: `node scripts/indexar.mjs`, `node scripts/raio-x.mjs --dias 30`, `node scripts/auditar.mjs <dir>`, `node scripts/enxugar.mjs [--aplicar <project>]` (deny heavy tools a project never uses, in its `.claude/settings.local.json`).
 
 </details>
 
@@ -584,6 +616,7 @@ Support for the website and the mobile app is in development. The pieces already
 | `avisoPct` | `0.8` | When the meter asks for a handoff |
 | `colheita` / `colheitaMin` | `true` / `10` | Harvest after N reads/searches with nothing registered |
 | `guarda.maxLinhas` / `maxBytes` | `800` / `80000` | When a full-file read is blocked |
+| `grafoAutomatico` | `true` | File comments, automatic module summaries and git co-change in search (see 4.5) |
 | `corte.ativo` / `maxChars` | `false` / `6000` | Shorten large Bash outputs to head and tail, full output saved in `.rubi/saidas/` (see 4.4) |
 
 </details>
@@ -592,9 +625,11 @@ Support for the website and the mobile app is in development. The pieces already
 <summary><b>Development</b></summary>
 
 ```bash
-npm test                     # 16 tests: code map, graph, search, map, hooks, output cut, X-ray, MCP stdio + HTTP
+npm test                     # 17 tests: code map, automatic graph, graph, search, map, hooks, output cut, X-ray, MCP stdio + HTTP
 node bench/rodar.mjs         # A/B benchmark (memory)
 node bench/saidas.mjs        # A/B benchmark (output shortening)
+node bench/economia.mjs      # 2x2 benchmark, long sessions (output shortening x trimmed context)
+node bench/estatistica.mjs economia-1 saidas-1   # paired statistics
 npm run empacotar            # dist/rubi.mcpb + dist/rubi.zip
 python docs/assets/build_svgs.py
 ```
@@ -629,6 +664,8 @@ python docs/assets/build_svgs.py
 11. Aider. *Repository map* (code graph ranked with PageRank). aider.chat/docs/repomap.html
 12. Anthropic. *Prompt caching* and *Claude Code hooks* documentation.
 13. Akita, F. *ai-memory*: long-term memory for AI coding agents. github.com/akitaonrails/ai-memory
+14. Gall, H., Hajek, K., & Jazayeri, M. (1998). *Detection of Logical Coupling Based on Product Release History.* ICSM 1998.
+15. Zimmermann, T., Weißgerber, P., Diehl, S., & Zeller, A. (2004). *Mining Version Histories to Guide Software Changes.* ICSE 2004.
 
 ---
 

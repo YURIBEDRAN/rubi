@@ -28,7 +28,10 @@ const SO = opt('--repos', '').split(',').filter(Boolean);
 // Braços: A = Claude Code puro; B = Rubi completo (padrão); C = Rubi sem colheita (só lê a memória);
 // D = Rubi sem colheita, com um grafo já preenchido (bench/sementes/<repo>), como num projeto maduro.
 const BRACOS = opt('--bracos', 'A,B').split(',');
-const CONFIG_BRACO = { B: {}, C: { colheita: false }, D: { colheita: false } };
+// E = C com o grafo automático (sem IA: comentários do topo, resumos automáticos, co-mudança no git);
+// a partir da 0.5 o C desliga o automático, pra comparação direta com o E.
+const CONFIG_BRACO = { B: {}, C: { colheita: false, grafoAutomatico: false }, D: { colheita: false }, E: { colheita: false } };
+const PROFUNDIDADE = opt('--profundidade', '1'); // commits clonados: o grafo automático usa o histórico do git
 const TAREFAS = JSON.parse(fs.readFileSync(path.join(AQUI, 'tarefas.json'), 'utf8')).filter((t) => !SO.length || SO.includes(t.repo));
 const FERRAMENTAS_RUBI = ['rubi_contexto', 'rubi_mapa', 'rubi_ler', 'rubi_registrar', 'rubi_escrever_resumo', 'rubi_salvar_handoff'].map((n) => `mcp__plugin_rubi_rubi__${n}`);
 
@@ -40,7 +43,7 @@ function claude(cwd, pergunta, comRubi, home) {
     const t = Date.now();
     // no Windows o `claude` é um .cmd e precisa de shell: aspas em tudo que tem espaço
     const q = (s) => (process.platform === 'win32' && /[\s"]/.test(s) ? `"${s.replace(/"/g, '\\"')}"` : s);
-    const p = spawn('claude', a.map(q), { cwd, shell: process.platform === 'win32', env: { ...process.env, RUBI_HOME: home, RUBI_VAULT: path.join(home, 'vault') } });
+    const p = spawn('claude', a.map(q), { cwd, shell: process.platform === 'win32', env: { ...process.env, ENABLE_CLAUDEAI_MCP_SERVERS: 'false', RUBI_HOME: home, RUBI_VAULT: path.join(home, 'vault') } });
     let out = '';
     p.stdout.on('data', (d) => (out += d));
     p.stdin.end(pergunta);
@@ -54,7 +57,7 @@ const peso = (u) => (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0)
 
 async function fluxo({ repo, url, perguntas }, braco, rep) {
   const dir = path.join(TRAB, `${repo}-${braco}-${rep}`);
-  execFileSync('git', ['clone', '-q', '--depth', '1', url, dir]);
+  execFileSync('git', ['clone', '-q', '--depth', PROFUNDIDADE, url, dir]);
   const home = path.join(TRAB, `home-${repo}-${braco}-${rep}`);
   if (braco !== 'A') { fs.mkdirSync(home, { recursive: true }); fs.writeFileSync(path.join(home, 'config.json'), JSON.stringify(CONFIG_BRACO[braco] || {})); }
   if (braco === 'D') {

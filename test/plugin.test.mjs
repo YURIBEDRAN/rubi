@@ -235,6 +235,31 @@ test('raio-x do contexto fixo: separa ferramentas, MCP, skills e arquivos, e cru
   assert.equal(usoDe(por['skills do plugin anthropic-skills'], usos), 1);
 });
 
+test('grafo automático: comentário do topo e arquivos que mudam juntos no git entram na busca, sem IA', async () => {
+  const { mapearCodigo } = await lib('codigo.mjs');
+  const { buscarContexto } = await lib('busca.mjs');
+  const dir = path.join(TMP, 'repo-git');
+  const g = (...a) => spawnSync('git', a, { cwd: dir, encoding: 'utf8' });
+  const arq = (rel, txt) => { fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true }); fs.writeFileSync(path.join(dir, rel), txt); };
+  fs.mkdirSync(dir, { recursive: true });
+  g('init', '-q'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't');
+  arq('src/pagamento/stripe.ts', '// Cobrança recorrente com assinatura mensal e reembolso.\nexport function cobrar() {}\n');
+  arq('src/telas/Recibo.tsx', 'export function Recibo() {}\n');
+  arq('src/outro.ts', 'export const x = 1;\n');
+  for (let i = 0; i < 3; i++) {
+    arq('src/pagamento/stripe.ts', `// Cobrança recorrente com assinatura mensal e reembolso.\nexport function cobrar() { return ${i}; }\n`);
+    arq('src/telas/Recibo.tsx', `export function Recibo() { return ${i}; }\n`);
+    g('add', '-A'); g('commit', '-q', '-m', `muda ${i}`);
+  }
+  const codigo = mapearCodigo(dir);
+  assert.equal(codigo.arquivos['src/pagamento/stripe.ts'].doc, 'Cobrança recorrente com assinatura mensal e reembolso.');
+  assert.ok(codigo.historico.pares.some(([a, b]) => a === 'src/pagamento/stripe.ts' && b === 'src/telas/Recibo.tsx'), 'mudam juntos');
+  const m = path.join(dir, '.rubi');
+  const r = buscarContexto({ m, raiz: dir, codigo, pergunta: 'onde fica o reembolso da assinatura?', orcamento: 1500 });
+  assert.match(r, /stripe\.ts/, 'achou pelo comentário do topo');
+  assert.match(r, /Recibo\.tsx/, 'e trouxe o arquivo que muda junto');
+});
+
 // ---------------------------------------------------------------- MCP
 function mcpStdio(extraEnv) {
   const p = spawn(process.execPath, [path.join(RAIZ, 'scripts', 'mcp-server.mjs')], { env: { ...env, ...extraEnv } });

@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { cabecaGit, coMudancas } from './historico.mjs';
 
 const EXT = {
   js: 'js', jsx: 'js', mjs: 'js', cjs: 'js', ts: 'js', tsx: 'js', vue: 'js', svelte: 'js',
@@ -83,6 +84,24 @@ function simbolos(lang, s) {
     case 'sql': r = todos(/create\s+(?:or\s+replace\s+)?(?:table|view|function|procedure)\s+(?:if\s+not\s+exists\s+)?([\w."]+)/gi, s); break;
   }
   return [...new Set(r.filter((x) => x && x.length > 1))].slice(0, 40);
+}
+
+// Comentário ou docstring do topo do arquivo: o que o próprio autor disse que ele faz.
+// Entra na busca por texto e no resumo automático do módulo, sem gastar token.
+const RUIDO = /copyright|license|licen[cç]a|spdx|eslint|prettier|@ts-|tslint|jshint|generated|gerado|coding[:=]|use strict/i;
+export function docDoTopo(lang, s) {
+  const t = s.slice(0, 5000).replace(/^﻿/, '').replace(/^#!.*\n/, '');
+  let texto = '';
+  if (lang === 'py') texto = t.match(/^\s*(?:#[^\n]*\n\s*)*[rRuUbB]{0,2}("""|''')([\s\S]*?)\1/)?.[2] || '';
+  if (!texto) {
+    const bloco = t.match(/^\s*\/\*+([\s\S]*?)\*\//);
+    const linhas = t.match(/^(?:[ \t]*(?:\/\/[/!]?|#)(?!include|define|pragma|import|!)[^\n]*\n)+/);
+    texto = bloco ? bloco[1] : linhas ? linhas[0] : '';
+  }
+  const limpo = texto.split('\n').map((l) => l.replace(/^\s*(?:\*+|\/\/[/!]?|#+)\s?/, '').trim())
+    .filter((l) => l && !RUIDO.test(l) && !/^@\w+/.test(l)).join(' ').replace(/[~=^-]{4,}/g, ' ').replace(/\s+/g, ' ').trim();
+  if (limpo.length < 12) return '';
+  return limpo.match(/^.{30,240}?[.!?](?=\s|$)/)?.[0] || limpo.slice(0, 240);
 }
 
 // ---- resolução de imports para arquivos do projeto ----
@@ -187,11 +206,11 @@ export function mapearCodigo(raiz, anterior = null) {
   for (const f of lista) {
     let st; try { st = fs.statSync(path.join(raiz, f)); } catch { continue; }
     const velho = antigos[f];
-    if (velho && velho.mtime === st.mtimeMs && velho.size === st.size) { arquivos[f] = velho; continue; }
+    if (velho && velho.mtime === st.mtimeMs && velho.size === st.size && 'doc' in velho) { arquivos[f] = velho; continue; }
     const lang = EXT[ext(f)];
     let s = '';
     if (st.size <= MAX_BYTES) { try { s = fs.readFileSync(path.join(raiz, f), 'utf8'); } catch {} }
-    arquivos[f] = { mtime: st.mtimeMs, size: st.size, lang, brutos: [...new Set(importsBrutos(lang, s))].slice(0, 200), simbolos: simbolos(lang, s) };
+    arquivos[f] = { mtime: st.mtimeMs, size: st.size, lang, brutos: [...new Set(importsBrutos(lang, s))].slice(0, 200), simbolos: simbolos(lang, s), doc: docDoTopo(lang, s) };
   }
   // resolve sempre (um arquivo novo pode satisfazer import antigo)
   const arestas = [];
@@ -208,5 +227,8 @@ export function mapearCodigo(raiz, anterior = null) {
     m.arquivos.push(f); m.rank += a.rank;
   }
   for (const m of Object.values(modulos)) m.arquivos.sort((x, y) => arquivos[y].rank - arquivos[x].rank);
-  return { geradoEm: Date.now(), raiz: posix(raiz), arquivos, modulos };
+  // arquivos que mudam juntos no git: só recalcula quando o HEAD muda
+  const head = cabecaGit(raiz);
+  const historico = !head ? null : anterior?.historico?.head === head ? anterior.historico : { head, pares: coMudancas(raiz, new Set(Object.keys(arquivos))) };
+  return { geradoEm: Date.now(), raiz: posix(raiz), arquivos, modulos, historico };
 }

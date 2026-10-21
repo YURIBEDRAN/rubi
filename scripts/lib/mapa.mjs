@@ -25,6 +25,23 @@ function resumoSalvo(p) {
 const blocoResumo = (texto, vazio) => `${INI}\n${texto || vazio}\n${FIM}`;
 const base = (f) => path.posix.basename(f);
 
+// Resumo do módulo sem IA: o README da pasta e o que os arquivos centrais dizem de si no topo.
+// Só vai pra página do módulo e pra busca; o mapa nível 0 (que entra em toda sessão) não cresce.
+function resumoAutomatico(nome, info, codigo) {
+  const linhas = [];
+  if (codigo.raiz && nome !== '(raiz)') {
+    for (const n of ['README.md', 'readme.md', 'README']) {
+      let md;
+      try { md = fs.readFileSync(path.join(codigo.raiz, nome, n), 'utf8'); } catch { continue; }
+      const par = md.split(/\n\s*\n/).map((p) => p.trim()).find((p) => p && !/^(#|!\[|\[!\[|<|```|---)/.test(p));
+      if (par) linhas.push(par.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_`]/g, '').replace(/\s+/g, ' ').slice(0, 300));
+      break;
+    }
+  }
+  for (const f of info.arquivos.filter((f) => codigo.arquivos[f]?.doc).slice(0, 4)) linhas.push(`${base(f)}: ${codigo.arquivos[f].doc}`);
+  return linhas.join('\n');
+}
+
 export function lerIndice(m) {
   try { return JSON.parse(fs.readFileSync(path.join(m, ARQ_INDICE), 'utf8')); } catch { return null; }
 }
@@ -65,6 +82,7 @@ export function gerarMapa(m, codigo, { projeto }) {
     const corpo = [
       `# Módulo ${nome}`,
       blocoResumo(resumo, '_Sem resumo ainda. Quando entender o módulo, escreva 2-5 linhas com rubi_escrever_resumo (alvo "modulo:' + nome + '")._'),
+      (() => { const a = resumoAutomatico(nome, info, codigo); return a ? `## Do próprio código (automático)\n<!-- rubi:auto -->\n${a}\n<!-- /rubi:auto -->` : ''; })(),
       `## Arquivos (${info.arquivos.length}, por centralidade)`,
       info.arquivos.slice(0, 30).map((f) => `- \`${f}\`${codigo.arquivos[f].simbolos.length ? ` — ${codigo.arquivos[f].simbolos.slice(0, 6).join(', ')}` : ''}`).join('\n') + (info.arquivos.length > 30 ? `\n- … +${info.arquivos.length - 30}` : ''),
       depende.size ? `## Depende de\n${[...depende].map((x) => `[[modulos/${idDe(x)}|${x}]]`).join(' · ')}` : '',

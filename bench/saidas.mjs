@@ -4,6 +4,8 @@
 // a informação fica no meio da saída (o pior caso pro corte, que guarda começo e fim).
 //
 //   node bench/saidas.mjs [--reps 3] [--modelo claude-sonnet-5] [--paralelo 4] [--nome saidas-1]
+//
+// Sem MCP externos (--strict-mcp-config, conectores do claude.ai desligados): eles conectam em tempos diferentes e mudam o contexto ao acaso.
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -60,10 +62,10 @@ const TAREFAS = [
 
 function claude(cwd, pergunta, home) {
   return new Promise((ok) => {
-    const a = ['-p', '--model', MODELO, '--output-format', 'json', '--plugin-dir', PLUGIN, '--allowedTools', 'Bash', 'Read', 'Grep', 'Glob'];
+    const a = ['-p', '--model', MODELO, '--output-format', 'json', '--plugin-dir', PLUGIN, '--allowedTools', 'Bash', 'Read', 'Grep', 'Glob', '--strict-mcp-config'];
     const t = Date.now();
     const q = (s) => (process.platform === 'win32' && /[\s"]/.test(s) ? `"${s.replace(/"/g, '\\"')}"` : s);
-    const p = spawn('claude', a.map(q), { cwd, shell: process.platform === 'win32', env: { ...process.env, RUBI_HOME: home, RUBI_VAULT: path.join(home, 'vault') } });
+    const p = spawn('claude', a.map(q), { cwd, shell: process.platform === 'win32', env: { ...process.env, ENABLE_CLAUDEAI_MCP_SERVERS: 'false', RUBI_HOME: home, RUBI_VAULT: path.join(home, 'vault') } });
     let out = '';
     p.stdout.on('data', (d) => (out += d));
     p.stdin.end(pergunta);
