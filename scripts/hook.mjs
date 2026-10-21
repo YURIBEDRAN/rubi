@@ -3,11 +3,12 @@
 // Recebe o JSON do Claude Code no stdin. Nunca pode quebrar a sessão: qualquer erro sai em silêncio.
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { lerConfig, lerEstado, salvarEstado, raizProjeto, nomeProjeto } from './lib/config.mjs';
-import { memoriaDoProjeto, ultimoHandoff, salvarSessao } from './lib/memoria.mjs';
+import { memoriaDoProjeto, ultimoHandoff, salvarSessao, garantir } from './lib/memoria.mjs';
 import { lerIndice, lerMapa, atualizarIndice } from './lib/mapa.mjs';
 import { buscarContexto } from './lib/busca.mjs';
 import { memoriaPessoal } from './lib/memoria.mjs';
@@ -99,7 +100,55 @@ function medidor(e) {
 
 function medidorHook(e) {
   const msg = medidor(e);
-  if (msg) responder(e.hook_event_name, { additionalContext: msg });
+  const saida = cortarSaida(e);
+  if (msg || saida) responder(e.hook_event_name || 'PostToolUse', { ...(msg ? { additionalContext: msg } : {}), ...(saida ? { updatedToolOutput: saida } : {}) });
+}
+
+// PostToolUse em Bash/PowerShell: saída grande fica com o começo e o fim, e o meio vai pra um arquivo.
+// Sem isso ela é relida a cada mensagem até o fim da sessão (nos transcripts, o Bash é ~12% do custo).
+// Erros e resumos costumam estar no fim, por isso a cauda é maior que a cabeça.
+function encurtar(texto, cabeca, cauda, aviso) {
+  if (texto.length <= cabeca + cauda + 200) return texto;
+  let ini = texto.lastIndexOf('\n', cabeca);
+  if (ini < cabeca * 0.5) ini = cabeca;
+  let fim = texto.indexOf('\n', texto.length - cauda);
+  if (fim < 0 || fim > texto.length - cauda * 0.5) fim = texto.length - cauda;
+  const meio = texto.slice(ini, fim);
+  const linhas = (meio.match(/\n/g) || []).length;
+  return `${texto.slice(0, ini)}\n\n[rubi] … ${linhas} linhas (${meio.length} caracteres) omitidas aqui. ${aviso}\n\n${texto.slice(fim)}`;
+}
+
+function cortarSaida(e) {
+  const cfg = lerConfig().corte;
+  if (!cfg.ativo || !['Bash', 'PowerShell'].includes(e.tool_name)) return null;
+  const r = e.tool_response;
+  const obj = r && typeof r === 'object';
+  const out = obj ? String(r.stdout ?? '') : String(r ?? '');
+  const err = obj ? String(r.stderr ?? '') : '';
+  if (out.length + err.length <= cfg.maxChars) return null;
+
+  const cmd = String(e.tool_input?.command || '');
+  const estado = lerEstado(e.session_id);
+  // o mesmo comando repetido logo depois de um corte passa inteiro: o agente pediu de novo de propósito
+  if (estado.ultimoCorte === cmd) { salvarEstado(e.session_id, { ...estado, ultimoCorte: null }); return null; }
+
+  const dir = raizProjeto(e.cwd) ? path.join(garantir(memoriaDoProjeto(e.cwd)), 'saidas') : path.join(os.tmpdir(), 'rubi-saidas');
+  fs.mkdirSync(dir, { recursive: true });
+  const n = ((estado.nCortes || 0) % 30) + 1; // gira em 30 arquivos, sem acumular
+  const arq = path.join(dir, `saida-${String(n).padStart(2, '0')}.txt`).replace(/\\/g, '/');
+  fs.writeFileSync(arq, `$ ${cmd}\n\n${out}${err ? `\n\n--- stderr ---\n${err}` : ''}`);
+  salvarEstado(e.session_id, { ...estado, ultimoCorte: cmd, nCortes: n });
+
+  const aviso = `Saída completa em ${arq} (use Grep ou Read com offset/limit nesse arquivo). Repetir o mesmo comando devolve tudo.`;
+  // cada fluxo cabe no que o outro deixou livre, com metade do limite garantida pra cada um
+  const parte = (texto, outro) => {
+    const lim = Math.max(cfg.maxChars - outro.length, cfg.maxChars / 2);
+    if (texto.length <= lim) return texto;
+    const f = Math.min(1, lim / cfg.maxChars);
+    return encurtar(texto, Math.round(cfg.cabeca * f), Math.round(cfg.cauda * f), aviso);
+  };
+  const novoOut = parte(out, err), novoErr = parte(err, out);
+  return obj ? { ...r, stdout: novoOut, stderr: novoErr } : novoOut;
 }
 
 // UserPromptSubmit: lembrança automática. Busca no grafo pelo que o usuário acabou de pedir e

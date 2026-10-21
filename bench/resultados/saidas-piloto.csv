@@ -1,0 +1,9 @@
+tarefa,braco,rep,certo,cortes,custo_usd,turnos,tempo_s,cache_escrita,cache_leitura,output,tokens_equiv,erro,gabarito
+"maiores","X",1,1,0,0.1269836,2,24,27904,62248,291,63492,"","types.ts / intrinsic-elements.ts / render.ts"
+"maiores","Y",1,1,1,0.12342819999999999,2,21,26925,62251,327,61714,"","types.ts / intrinsic-elements.ts / render.ts"
+"grep-meio","X",1,1,0,0.1318678,4,20,26520,107479,428,65934,"","41 / 1618"
+"grep-meio","Y",1,1,1,0.1527174,5,36,26931,150087,1496,76359,"","41 / 1618"
+"ls-files","X",1,1,0,0.1121036,2,19,24482,62238,172,56052,"","583 / 66"
+"ls-files","Y",1,1,0,0.1121162,2,17,24485,62241,172,56058,"","583 / 66"
+"build-log","X",1,1,0,0.12887200000000001,3,21,25705,107700,450,64436,"","payments / STRIPE_WEBHOOK_SECRET"
+"build-log","Y",1,1,1,0.15402339999999998,5,26,26327,200227,865,77012,"","payments / STRIPE_WEBHOOK_SECRET"

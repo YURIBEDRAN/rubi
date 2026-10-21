@@ -24,12 +24,13 @@ export function memoriaDoProjeto(dir) {
   return r ? path.join(r, '.rubi') : memoriaPessoal();
 }
 
-const GITIGNORE = '# índice derivado e registros automáticos: recriáveis, não vão pro git\n.indice.json\nsessoes/\n';
+const GITIGNORE = '# índice derivado e registros automáticos: recriáveis, não vão pro git\n.indice.json\nsessoes/\nsaidas/\n';
 
 export function garantir(m) {
   for (const sub of ['conhecimento', 'modulos', 'handoffs', 'sessoes']) fs.mkdirSync(path.join(m, sub), { recursive: true });
   const gi = path.join(m, '.gitignore');
   if (!fs.existsSync(gi)) fs.writeFileSync(gi, GITIGNORE);
+  else if (!/^saidas\/$/m.test(fs.readFileSync(gi, 'utf8'))) fs.appendFileSync(gi, 'saidas/\n'); // memórias criadas antes da 0.5
   return m;
 }
 

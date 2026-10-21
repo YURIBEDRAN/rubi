@@ -39,7 +39,7 @@ AI coding assistants are billed for every token they read, and in a long convers
 
 Everything is plain markdown inside the project (`.rubi/`), opens as an Obsidian graph, and runs locally with zero dependencies. It was built for Claude Code and, because its core is a standard MCP server, it also runs in **Codex, Gemini CLI, Cursor, GitHub Copilot, Windsurf, Cline, OpenCode, Continue, Goose and Zed**, with hosted or **local models** ([see the table](#codex-gemini-cli-cursor-copilot-and-other-agents)).
 
-**Results.** Two studies, reported as measured, including what did not work:
+**Results.** Three studies, reported as measured, including what did not work:
 
 | Study | Result |
 |---|---|
@@ -47,6 +47,7 @@ Everything is plain markdown inside the project (`.rubi/`), opens as an Obsidian
 | A/B benchmark, 90 sessions, reading a mature graph | **−37% steps, −37% context re-read, −17% time**; billed cost **−6%** in short cold-start sessions |
 | Same, projected onto the real cost mix (71% cache reads) | **≈26% lower cost** (projection, not yet measured) |
 | A/B benchmark, writing memory after every answer | **+15% cost** in short sessions, so the default was changed to write less often |
+| Five more ideas, measured on top of early compaction | the fixed context is **13% of the cost** and is now diagnosed by the X-ray; shortening outputs and restarting after pauses add at most 1.5 points, so they stay off ([4.4](#44-study-3-other-savings-measured-before-building)) |
 
 ---
 
@@ -366,6 +367,22 @@ That is a **projection**, not a measurement. Measuring it properly needs long, m
 
 **Where the largest saving is.** Of everything measured, the largest lever is still **keeping sessions short** (Study 1: about 37% of total cost, simulated on real usage). The knowledge graph's measured contribution is **fewer steps and less re-reading**, which compounds in long sessions and on codebases the model has never seen. Flask and Hono are famous projects the model partly knows from training, the least favorable case for a memory.
 
+### 4.4 Study 3: other savings, measured before building
+
+Five further ideas were measured on 30 days of transcripts (431 transcripts, October 2026) before any of them was turned on. Each one was evaluated **on top of early compaction at 150k**, since that is how Rubi runs; a saving that early compaction already captures is not counted twice.
+
+| Idea | What the data showed | Decision |
+|---|---|---|
+| **Shorten large command outputs** (keep the head and tail, save the full output to a file) | Bash outputs are about 12% of the cost of carrying context. With compaction at 150k they leave the context sooner, and the gross saving falls to **0.8%**. In a pilot A/B (4 tasks with large outputs, one with the answer in the middle of the output), answers were equally correct (4/4 in both arms), but when the answer was in the middle the agent needed two extra turns to read the saved file, and those sessions cost 16 to 20% more. Break-even is reached when about 1 in 6 cuts needs the middle. | **Built, off by default** (`corte.ativo`). Useful without early compaction. |
+| **Restart after a long pause** (the cache expires and the whole context is written again) | Full cache rewrites in the middle of a session cost 8.5%, mostly after pauses longer than an hour. On top of compaction at 150k, restarting from a handoff would add **1.5 percentage points**, at the price of about 4 interruptions a day. Claude Code 2.1.290 and later compact idle sessions shortly before the one-hour cache expires, on by default. | **Not built.** Update Claude Code. |
+| **Trim the fixed context** (everything loaded before the first message) | Median 44k tokens, re-read on every call: **13% of the cost**, so each 1k tokens removed saves about 0.3% (more with early compaction). Denying a tool in the settings removes its definition: measured with Claude Code 2.1.280, `Workflow` took 1,479 tokens and `ScheduleWakeup` 1,255. | **Built** into the X-ray: what fills the fixed context, how often each part was used, and how to remove what is not. |
+| **File outlines instead of full reads** | `Read` results are about 4% of the carrying cost before compaction and about 1% after, with the same extra-turn risk as shortening outputs. The read guard already blocks very large full reads. | Not built. |
+| **Compress the text Rubi injects** | The map (~500 tokens) and recall (≤700) are a small part of a 44k fixed context. Compressing them would save under 0.2%, with a risk of losing facts. | Not built. |
+
+The bundled `rubi-pesquisador` subagent now runs on Haiku: its job is to read and summarize, so it does not need a larger model. No other model routing was added.
+
+Reproduce: `node bench/saidas.mjs --reps 3` (output shortening A/B; the pilot is in [`bench/resultados/saidas-piloto.md`](bench/resultados/saidas-piloto.md)) and `/rubi:raio-x` (fixed context).
+
 ---
 
 ## 5. Walkthrough: a week with Rubi
@@ -551,7 +568,7 @@ Support for the website and the mobile app is in development. The pieces already
 - `/rubi:memoria <topic>`: search the project memory and learn what is worth storing.
 - `/rubi:handoff`: register facts and save a handoff now.
 - `/rubi:organizar`: slim down a large `CLAUDE.md` into the graph and the map.
-- `/rubi:raio-x`: where your tokens go, and what to change first.
+- `/rubi:raio-x`: where your tokens go, what fills the fixed context and how often each part is used, and what to change first.
 - Agent `rubi-pesquisador`: researches the codebase in its own context window, on Haiku, and returns only the conclusion.
 - CLI: `node scripts/indexar.mjs`, `node scripts/raio-x.mjs --dias 30`, `node scripts/auditar.mjs <dir>`.
 
@@ -567,6 +584,7 @@ Support for the website and the mobile app is in development. The pieces already
 | `avisoPct` | `0.8` | When the meter asks for a handoff |
 | `colheita` / `colheitaMin` | `true` / `10` | Harvest after N reads/searches with nothing registered |
 | `guarda.maxLinhas` / `maxBytes` | `800` / `80000` | When a full-file read is blocked |
+| `corte.ativo` / `maxChars` | `false` / `6000` | Shorten large Bash outputs to head and tail, full output saved in `.rubi/saidas/` (see 4.4) |
 
 </details>
 
@@ -574,8 +592,9 @@ Support for the website and the mobile app is in development. The pieces already
 <summary><b>Development</b></summary>
 
 ```bash
-npm test                     # 14 tests: code map, graph, search, map, hooks, MCP stdio + HTTP
-node bench/rodar.mjs         # A/B benchmark
+npm test                     # 16 tests: code map, graph, search, map, hooks, output cut, X-ray, MCP stdio + HTTP
+node bench/rodar.mjs         # A/B benchmark (memory)
+node bench/saidas.mjs        # A/B benchmark (output shortening)
 npm run empacotar            # dist/rubi.mcpb + dist/rubi.zip
 python docs/assets/build_svgs.py
 ```

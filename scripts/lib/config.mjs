@@ -17,12 +17,15 @@ const PADRAO = {
   colheitaMin: 10, // quantas leituras/buscas sem registro disparam a colheita (benchmark: abaixo disso não compensa)
   lembranca: true, // a cada pedido, injeta o conhecimento relevante do grafo
   lembrancaOrcamento: 700, // tokens no máximo
+  // saída de comando grande: ficam o começo e o fim, o meio vai pra um arquivo. Desligado por padrão: com a compactação
+  // em 150k a economia medida foi ~0,8% e some se 1 em cada 6 cortes obrigar o agente a buscar o meio (bench/saidas.mjs).
+  corte: { ativo: false, maxChars: 6000, cabeca: 1500, cauda: 3000 },
 };
 
 export function lerConfig() {
   let arq = {};
   try { arq = JSON.parse(fs.readFileSync(ARQ_CONFIG, 'utf8')); } catch {}
-  const c = { ...PADRAO, ...arq, guarda: { ...PADRAO.guarda, ...(arq.guarda || {}) } };
+  const c = { ...PADRAO, ...arq, guarda: { ...PADRAO.guarda, ...(arq.guarda || {}) }, corte: { ...PADRAO.corte, ...(arq.corte || {}) } };
   // o Claude Desktop pode passar a variável vazia ou sem substituir ("${user_config.vault}") quando o campo fica em branco
   const v = process.env.RUBI_VAULT;
   if (v && !v.includes('${')) c.vault = v;

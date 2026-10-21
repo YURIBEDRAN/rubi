@@ -18,7 +18,7 @@ const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const MODO_HTTP = args.includes('--http');
 const MODO_APP = MODO_HTTP || process.env.RUBI_MODO === 'app';
-const VERSAO = '0.4.1';
+const VERSAO = '0.5.0';
 
 // Pasta do projeto: RUBI_PROJECT_DIR, CLAUDE_PROJECT_DIR, os "roots" que o cliente MCP informa, ou a pasta atual.
 let DIR_PROJETO = process.env.RUBI_PROJECT_DIR || process.env.CLAUDE_PROJECT_DIR || null;

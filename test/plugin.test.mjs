@@ -194,6 +194,47 @@ test('guarda barra arquivo gigante uma vez e libera na segunda', () => {
   assert.equal(hook('guarda', { session_id: 's8', tool_name: 'Bash', tool_input: { command: 'cat grande.log' }, cwd: PROJ }).permissionDecision, 'deny');
 });
 
+test('corte: saída grande de comando fica com começo e fim, o resto vai pra arquivo; repetir devolve tudo', () => {
+  const saida = Array.from({ length: 800 }, (_, i) => `linha ${i} ${'x'.repeat(20)}`).join('\n') + '\nERRO FINAL: 3 testes falharam';
+  const e = { session_id: 's-corte', hook_event_name: 'PostToolUse', tool_name: 'Bash', cwd: PROJ, tool_input: { command: 'npm test' },
+    tool_response: { stdout: saida, stderr: '', interrupted: false, isImage: false } };
+  assert.equal(hook('medidor', e), null, 'desligado por padrão');
+  const home = path.join(TMP, 'home-corte');
+  fs.mkdirSync(home, { recursive: true });
+  fs.writeFileSync(path.join(home, 'config.json'), JSON.stringify({ corte: { ativo: true } }));
+  const ligado = { RUBI_HOME: home };
+  const out = hook('medidor', e, ligado);
+  const novo = out.updatedToolOutput;
+  assert.equal(novo.interrupted, false, 'mantém o formato da resposta do Bash');
+  assert.ok(novo.stdout.length < 5500, `cortou (${novo.stdout.length})`);
+  assert.match(novo.stdout, /^linha 0 /);
+  assert.match(novo.stdout, /ERRO FINAL: 3 testes falharam$/, 'o fim, onde ficam os erros, fica');
+  const arq = novo.stdout.match(/Saída completa em (\S+)/)[1];
+  assert.ok(fs.readFileSync(arq, 'utf8').includes('linha 400 '), 'o meio está no arquivo');
+  assert.match(fs.readFileSync(path.join(MEM, '.gitignore'), 'utf8'), /^saidas\/$/m);
+  assert.equal(hook('medidor', e, ligado), null, 'o mesmo comando de novo passa inteiro');
+  assert.equal(hook('medidor', { ...e, session_id: 's-corte2', tool_response: { stdout: 'curto', stderr: '' } }, ligado), null, 'saída curta não mexe');
+});
+
+test('raio-x do contexto fixo: separa ferramentas, MCP, skills e arquivos, e cruza com o uso', async () => {
+  const { partesDoFixo, somarPartes, usoDe } = await lib('fixo.mjs');
+  const anexos = [
+    { type: 'prompt_snapshot', systemPrompt: ['x'.repeat(3500)], tools: [{ name: 'Workflow', description: 'd'.repeat(600), schema: {} }, { name: 'mcp__rea__abrir', description: 'a', schema: {} }] },
+    { type: 'deferred_tools_delta', addedNames: ['mcp__rea__x', 'mcp__rea__y', 'Monitor'] },
+    { type: 'skill_listing', content: '- brag: faz vídeo\n- anthropic-skills:pdf: lê pdf' },
+    { type: 'instructions', files: [{ path: 'C:/p/CLAUDE.md', content: 'y'.repeat(700) }] },
+  ];
+  const partes = somarPartes([partesDoFixo(anexos)]);
+  const por = Object.fromEntries(partes.map((p) => [p.chave, p]));
+  assert.equal(Math.round(por['prompt do sistema'].tokens), 1000);
+  assert.ok(por['ferramenta Workflow'] && por['MCP rea (ferramentas carregadas)'] && por['MCP rea (nomes das ferramentas)']);
+  assert.ok(por['skills do plugin anthropic-skills'] && por['arquivo p/CLAUDE.md']);
+  const usos = new Map([['Workflow', 3], ['skill:anthropic-skills:pdf', 1]]);
+  assert.equal(usoDe(por['ferramenta Workflow'], usos), 3);
+  assert.equal(usoDe(por['MCP rea (nomes das ferramentas)'], usos), 0);
+  assert.equal(usoDe(por['skills do plugin anthropic-skills'], usos), 1);
+});
+
 // ---------------------------------------------------------------- MCP
 function mcpStdio(extraEnv) {
   const p = spawn(process.execPath, [path.join(RAIZ, 'scripts', 'mcp-server.mjs')], { env: { ...env, ...extraEnv } });

@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { partesDoFixo, somarPartes, usoDe, comoTirar } from './lib/fixo.mjs';
 
 const args = process.argv.slice(2);
 const diasIdx = args.indexOf('--dias');
@@ -37,6 +38,9 @@ const sessoes = [];
 const porFerramenta = {}; // nome -> { n, chars, carrego }
 const maioresResultados = [];
 let expiracoes = 0, tokensExpiracao = 0;
+const usos = new Map(); // ferramenta ou skill -> vezes usada
+const fixos = []; // partes do contexto fixo das sessões principais, da mais nova pra mais velha
+let custoFixo = 0; // o prefixo fixo, relido (ou reescrito) em toda chamada
 
 for (const arq of jsonls(raiz)) {
   const st = fs.statSync(arq);
@@ -46,12 +50,16 @@ for (const arq of jsonls(raiz)) {
   const nomeFerramenta = {};
   const chamadas = []; // contexto por chamada à API, em ordem
   const resultados = []; // { idxChamada, nome, chars, desc }
-  const s = { arq, projeto: path.basename(path.dirname(arq)), custo: 0, read: 0, ctx0: 0, pico: 0, chamadas: 0, inicio: null };
+  const s = { arq, projeto: path.basename(path.dirname(arq)), custo: 0, read: 0, ctx0: 0, pico: 0, chamadas: 0, inicio: null, mtime: st.mtimeMs };
+  const anexos = [];
+  const subagente = /[\\/]subagents[\\/]|[\\/]agent-[^\\/]*\.jsonl$/.test(arq);
 
   for (const l of linhas) {
     if (!l) continue;
     let o; try { o = JSON.parse(l); } catch { continue; }
     if (o.timestamp && !s.inicio) s.inicio = o.timestamp;
+    // a cópia com as ferramentas é gravada logo depois da primeira resposta
+    if (o.attachment && s.chamadas < 2) anexos.push(o.attachment);
     const m = o.message;
     if (!m) continue;
     if (o.type === 'assistant' && m.usage && m.id && !vistos.has(m.id)) {
@@ -67,6 +75,7 @@ for (const arq of jsonls(raiz)) {
       const ctx = inp + w5m + w1h + r;
       s.custo += custo; s.read += r;
       if (!s.chamadas) s.ctx0 = ctx;
+      custoFixo += s.ctx0 * (w5m + w1h > 0.5 * ctx && s.chamadas ? (w1h >= w5m ? PESO.write1h : PESO.write5m) : s.chamadas ? PESO.read : 0);
       s.pico = Math.max(s.pico, ctx);
       // escrita grande no meio da sessão com contexto já grande = cache expirou e foi reescrito
       if (s.chamadas > 0 && w5m + w1h > 30000 && r < (w5m + w1h)) { expiracoes++; tokensExpiracao += w5m + w1h; }
@@ -75,7 +84,12 @@ for (const arq of jsonls(raiz)) {
     }
     if (Array.isArray(m.content)) {
       for (const b of m.content) {
-        if (b.type === 'tool_use') nomeFerramenta[b.id] = { nome: b.name, desc: JSON.stringify(b.input || {}).slice(0, 90) };
+        if (b.type === 'tool_use') {
+          nomeFerramenta[b.id] = { nome: b.name, desc: JSON.stringify(b.input || {}).slice(0, 90) };
+          const chave = b.name === 'Skill' && b.input?.skill ? `skill:${b.input.skill}` : b.name;
+          usos.set(chave, (usos.get(chave) || 0) + 1);
+          if (chave !== b.name) usos.set(b.name, (usos.get(b.name) || 0) + 1);
+        }
         if (b.type === 'tool_result') {
           const t = nomeFerramenta[b.tool_use_id] || { nome: '?', desc: '' };
           resultados.push({ idx: chamadas.length, nome: t.nome, desc: t.desc, chars: tamanhoConteudo(b.content) });
@@ -84,6 +98,7 @@ for (const arq of jsonls(raiz)) {
     }
   }
   if (!s.chamadas) continue;
+  if (!subagente && anexos.some((a) => a.type === 'prompt_snapshot' && a.tools)) fixos.push({ mtime: st.mtimeMs, partes: partesDoFixo(anexos) });
   // "carrego": quantas vezes cada resultado foi relido nas chamadas seguintes (até o fim ou até compactar)
   for (const r of resultados) {
     const relidas = Math.max(0, chamadas.length - r.idx);
@@ -146,4 +161,24 @@ for (const LIMITE of [100e3, 150e3, 250e3]) {
   }
   const economia = (leituraReal - leitura) * PESO.read - reescrita;
   console.log(`  limite ${fmt(LIMITE)}: ${trocas} trocas de janela, economia ~${pct(economia, custoTotal)} do custo total`);
+}
+
+// O que ocupa o contexto fixo, quanto custa e quanto é de fato usado.
+if (fixos.length) {
+  const recentes = fixos.sort((a, b) => b.mtime - a.mtime).slice(0, 20).map((f) => f.partes);
+  const partes = somarPartes(recentes);
+  const medianaCtx0 = ctx0[ctx0.length >> 1] || 1;
+  const porMil = (custoFixo / custoTotal) / medianaCtx0 * 1000;
+  console.log(`\nContexto fixo (média das ${recentes.length} sessões principais mais recentes; estimativa, confira com /context):`);
+  console.log(`  ele é ${pct(custoFixo, custoTotal)} do custo; cada 1k tokens a menos nele ≈ ${(porMil * 100).toFixed(2)}% do custo (mais, com compactação cedo)`);
+  for (const p of partes.slice(0, 14)) {
+    const u = usoDe(p, usos);
+    const uso = u == null ? '' : u === 0 ? '  nunca usado no período' : `  usado ${u}x`;
+    console.log(`  ${fmt(p.tokens).padStart(5)}  ${p.chave}${p.presenca < 0.95 ? ` (em ${Math.round(p.presenca * 100)}% das sessões)` : ''}${uso}`);
+  }
+  const candidatos = partes.filter((p) => p.tokens >= 500 && ['ferramenta', 'mcp', 'skills'].includes(p.tipo) && (usoDe(p, usos) ?? 99) <= 2);
+  if (candidatos.length) {
+    console.log('\n  Pouco ou nunca usados, e pesando em toda mensagem:');
+    for (const p of candidatos.slice(0, 8)) console.log(`  - ${p.chave} (~${fmt(p.tokens)}, ≈ ${(p.tokens / 1000 * porMil * 100).toFixed(1)}% do custo): ${comoTirar(p)}`);
+  }
 }
